@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Excel Web App{% endblock %}
+{% block page_title %}Excel Заполнение - Web версия{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-home me-2"></i>Главная панель</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-info h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-boxes me-2"></i>Номенклатура</h5>
+                                    <p class="flex-grow-1">Управление списком товаров и материалов для заказов</p>
+                                    <a href="/page/nomenclature" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-success h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-map-marker-alt me-2"></i>Адреса</h5>
+                                    <p class="flex-grow-1">Управление адресами доставки и контактными лицами</p>
+                                    <a href="/page/addresses" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-warning h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-file-alt me-2"></i>Шаблоны</h5>
+                                    <p class="flex-grow-1">Настройка шаблонов для различных типов заказов</p>
+                                    <a href="/page/templates" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-purple h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-chart-line me-2"></i>Анализ</h5>
+                                    <p class="flex-grow-1">Перенос списаний</p>
+                                    <a href="/page/pandas" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-info h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-boxes me-2"></i>Партийный учет</h5>
+                                    <p class="flex-grow-1">Обнаружение минусов в файлах партийного учета</p>
+                                    <a href="/page/particle" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-4">
+                            <div class="card text-white bg-warning h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5><i class="fas fa-file-alt me-2"></i>Проверка списаний</h5>
+                                    <p class="flex-grow-1">Автоматическая проверка заявок на признак списания</p>
+                                    <a href="/page/work_orders" class="btn btn-light mt-2">Перейти →</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5><i class="fas fa-shopping-cart me-2"></i>Быстрый заказ</h5>
+                                </div>
+                                <div class="card-body d-flex flex-column">
+                                    <p class="flex-grow-1">Создайте новый заказ за несколько кликов</p>
+                                    <div class="btn-group w-100">
+                                        <a href="/page/order/КЦ" class="btn btn-primary flex-grow-1">
+                                            <i class="fas fa-shopping-cart me-2"></i>Заказ КЦ
+                                        </a>
+                                        <a href="/page/order/Расходники" class="btn btn-warning flex-grow-1">
+                                            <i class="fas fa-tools me-2"></i>Заказ Расходников
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <h5><i class="fas fa-history me-2"></i>Последние действия</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group">
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Создан новый заказ КЦ</h6>
+                                                <small>Только что</small>
+                                            </div>
+                                            <p class="mb-1">Готов к заполнению</p>
+                                        </div>
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">База данных обновлена</h6>
+                                                <small>2 часа назад</small>
+                                            </div>
+                                            <p class="mb-1">Добавлены новые позиции</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle me-2"></i>О системе</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Это веб-версия приложения для работы с Excel файлами, позволяющая:</p>
+                                    <ul>
+                                        <li>Управлять номенклатурой товаров и материалов</li>
+                                        <li>Создавать и редактировать адреса доставки</li>
+                                        <li>Настраивать шаблоны для различных типов заказов</li>
+                                        <li>Формировать заказы КЦ и Расходников</li>
+                                        <li>Проводить анализ данных с помощью Pandas</li>
+                                        <li>Экспортировать результаты в Excel формат</li>
+                                    </ul>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-lightbulb me-2"></i>
+                                        <strong>Совет:</strong> Используйте боковую панель для быстрой навигации по разделам
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Загружаем статистику для диаграммы
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.createElement('canvas');
+                ctx.id = 'statsChart';
+                document.querySelector('.card-body').appendChild(ctx);
+                
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['КЦ', 'Расходники'],
+                        datasets: [{
+                            label: 'Количество позиций',
+                            data: [
+                                data.nomenclature_by_type['КЦ'] || 0,
+                                data.nomenclature_by_type['Расходники'] || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.8)',
+                                'rgba(255, 159, 64, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 159, 64, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Распределение номенклатуры по типам'
+                            }
+                        }
+                    }
+                });
+            });
+    });
+</script>
+{% endblock %}
+{% endblock %}

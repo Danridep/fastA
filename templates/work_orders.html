@@ -1,0 +1,1477 @@
+{% extends "base.html" %}
+
+{% block title %}Обработка заявок - Excel Web App{% endblock %}
+{% block page_title %}Проверка заявок на нарушения{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Статус уведомлений -->
+    <div id="notification-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1050"></div>
+
+    <!-- Главная панель -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-search me-2"></i>Проверка заявок на нарушения правил</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Форма загрузки -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Загрузка файлов</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="uploadForm">
+                                        <div class="row">
+                                            <!-- Файл с типами работ (необязательный) -->
+                                            <div class="col-md-6 mb-3">
+                                                <label for="workTypesFile" class="form-label">
+                                                    <i class="fas fa-file-alt me-1"></i>Файл с типами работ
+                                                    <span class="text-muted small">(необязательно)</span>
+                                                </label>
+                                                <input type="file" class="form-control" id="workTypesFile" accept=".xlsx,.xls">
+                                                <div class="form-text">
+                                                    Если не загрузить, будут использоваться типы работ из базы данных
+                                                </div>
+                                            </div>
+
+                                            <!-- Файл с заявками (обязательный) -->
+                                            <div class="col-md-6 mb-3">
+                                                <label for="ordersFile" class="form-label">
+                                                    <i class="fas fa-clipboard-list me-1"></i>Файл с заявками *
+                                                </label>
+                                                <input type="file" class="form-control" id="ordersFile" accept=".xlsx,.xls" required>
+                                                <div class="form-text">
+                                                    Excel файл с заявками для проверки
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Информация о файлах -->
+                                        <div class="row mb-3" id="fileInfoContainer">
+                                            <div class="col-md-6" id="workTypesFileInfo"></div>
+                                            <div class="col-md-6" id="ordersFileInfo"></div>
+                                        </div>
+
+                                        <!-- Требования к файлам -->
+                                        <div class="alert alert-info">
+                                            <h6><i class="fas fa-info-circle me-2"></i>Требования к файлам:</h6>
+                                            <ul class="mb-0">
+                                                <li><strong>Типы работ:</strong> должны быть колонки: "Наименование", "Наличие списания материалов", "Наличие списания оборудования", "Количество строк демонтажа", "ТО"</li>
+                                                <li><strong>Заявки:</strong> должны быть колонки: "Наряд", "Исполнитель", "Город", "Номер заявки", "Тип работ"</li>
+                                                <li>Формат Excel (.xlsx или .xls)</li>
+                                            </ul>
+                                        </div>
+
+                                        <!-- Кнопка отправки -->
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                                <i class="fas fa-play me-2"></i>Начать проверку
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Информационная панель -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Как это работает</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Система проверяет заявки на соответствие правилам:</p>
+                                    <ol class="small">
+                                        <li>Загружаются типы работ с правилами (из файла или БД)</li>
+                                        <li>Загружаются заявки для проверки</li>
+                                        <li>Проверяются нарушения по каждому типу работ</li>
+                                        <li>Результаты группируются по ТО/не-ТО</li>
+                                        <li>Не-ТО заявки группируются по областям</li>
+                                        <li>Создаются файлы с результатами</li>
+                                    </ol>
+                                    <div class="alert alert-warning small">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        ТО заявки выделяются <span class="text-danger">красным</span>,
+                                        не-ТО - <span class="text-warning">желтым</span>
+                                    </div>
+                                    <div class="alert alert-success small">
+                                        <i class="fas fa-database me-1"></i>
+                                        Типы работ хранятся в базе данных. Вы можете загрузить новые типы или использовать существующие.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Панель управления типами работ -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Управление типами работ</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-upload fa-2x text-primary mb-3"></i>
+                                            <h5>Загрузить в БД</h5>
+                                            <p class="small text-muted">Загрузите Excel файл с типами работ в базу данных</p>
+                                            <button class="btn btn-outline-primary w-100" onclick="window.location.href='/page/work-types'">
+                                                <i class="fas fa-external-link-alt me-1"></i>Перейти к загрузке
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-list fa-2x text-success mb-3"></i>
+                                            <h5>Просмотр типов</h5>
+                                            <p class="small text-muted">Просмотр и редактирование типов работ в базе данных</p>
+                                            <button class="btn btn-outline-success w-100" onclick="window.location.href='/page/work-types'">
+                                                <i class="fas fa-external-link-alt me-1"></i>Просмотреть список
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-download fa-2x text-info mb-3"></i>
+                                            <h5>Экспорт типов</h5>
+                                            <p class="small text-muted">Скачайте текущие типы работ в Excel файл</p>
+                                            <button class="btn btn-outline-info w-100" onclick="downloadWorkTypes()">
+                                                <i class="fas fa-download me-1"></i>Экспортировать
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Статус обработки -->
+                    <div id="processingSection" class="d-none">
+                        <div class="card mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Статус обработки</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="progressContainer">
+                                    <!-- Прогресс бар и статус будут здесь -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Результаты -->
+                    <div id="resultsSection" class="d-none">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Результаты проверки</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="resultsContent">
+                                    <!-- Результаты будут здесь -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+
+    <!-- Модальное окно прогресса -->
+    <div class="modal fade" id="progressModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-cogs me-2"></i>Обработка заявок
+                    </h5>
+                </div>
+                <div class="modal-body text-center">
+                    <!-- Анимированный спиннер -->
+                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+
+                    <!-- Сообщение о прогрессе -->
+                    <h5 id="progressMessage" class="mb-3">Начало обработки...</h5>
+
+                    <!-- Прогресс бар -->
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                             role="progressbar"
+                             id="progressBar"
+                             style="width: 0%"
+                             aria-valuenow="0"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            <span id="progressPercent">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Детали обработки -->
+                    <div class="alert alert-info small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <span id="detailsText">Инициализация...</span>
+                    </div>
+
+                    <!-- ID сессии -->
+                    <div class="card mt-3">
+                        <div class="card-body py-2">
+                            <small class="text-muted">ID сессии:</small>
+                            <div class="font-monospace small" id="sessionIdDisplay"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для копирования текста -->
+    <div class="modal fade" id="copyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="copyModalTitle">Копировать текст</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Текст для копирования:</label>
+                        <textarea class="form-control font-monospace" id="copyTextArea" rows="12" readonly
+                                  style="font-size: 0.9rem; resize: none;"></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        Нажмите на текст, чтобы выделить его, затем используйте <kbd>Ctrl+C</kbd> или <kbd>⌘+C</kbd> для копирования
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Закрыть
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="copyToClipboard()">
+                        <i class="fas fa-copy me-2"></i>Скопировать в буфер
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно региональных данных -->
+    <div class="modal fade" id="regionModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="regionModalTitle">Данные по региону</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="regionContent">
+                        <!-- Данные региона будут здесь -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Закрыть
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно статистики -->
+    <div class="modal fade" id="statsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="fas fa-chart-bar me-2"></i>Статистика проверки
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="statsContent">
+                        <!-- Статистика будет здесь -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    class WorkOrderProcessor {
+        constructor() {
+            this.currentSession = null;
+            this.progressModal = null;
+            this.intervalId = null;
+            this.currentStats = null;
+            this.regionalData = null;
+
+            this.init();
+        }
+
+        init() {
+            this.cacheElements();
+            this.setupEventListeners();
+            this.setupModals();
+
+            // Проверяем, есть ли активная сессия в URL
+            this.checkSessionFromUrl();
+
+            // Проверяем статус типов работ
+            this.checkWorkTypesStatus();
+        }
+
+        cacheElements() {
+            this.elements = {
+                uploadForm: document.getElementById('uploadForm'),
+                workTypesFile: document.getElementById('workTypesFile'),
+                ordersFile: document.getElementById('ordersFile'),
+                submitBtn: document.getElementById('submitBtn'),
+                processingSection: document.getElementById('processingSection'),
+                resultsSection: document.getElementById('resultsSection'),
+                progressContainer: document.getElementById('progressContainer'),
+                resultsContent: document.getElementById('resultsContent'),
+                progressModal: document.getElementById('progressModal'),
+                progressBar: document.getElementById('progressBar'),
+                progressPercent: document.getElementById('progressPercent'),
+                progressMessage: document.getElementById('progressMessage'),
+                detailsText: document.getElementById('detailsText'),
+                sessionIdDisplay: document.getElementById('sessionIdDisplay'),
+                copyModal: document.getElementById('copyModal'),
+                copyTextArea: document.getElementById('copyTextArea'),
+                regionModal: document.getElementById('regionModal'),
+                regionContent: document.getElementById('regionContent'),
+                statsModal: document.getElementById('statsModal'),
+                statsContent: document.getElementById('statsContent'),
+                fileInfoContainer: document.getElementById('fileInfoContainer'),
+                workTypesFileInfo: document.getElementById('workTypesFileInfo'),
+                ordersFileInfo: document.getElementById('ordersFileInfo')
+            };
+        }
+
+        setupEventListeners() {
+            // Обработка формы
+            if (this.elements.uploadForm) {
+                this.elements.uploadForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.startProcessing();
+                });
+            }
+
+            // Отслеживание изменений в файловых полях
+            if (this.elements.workTypesFile) {
+                this.elements.workTypesFile.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.showFileInfo('workTypesFileInfo', e.target.files[0], 'Файл типов работ');
+                    } else {
+                        this.clearFileInfo('workTypesFileInfo');
+                    }
+                });
+            }
+
+            if (this.elements.ordersFile) {
+                this.elements.ordersFile.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.showFileInfo('ordersFileInfo', e.target.files[0], 'Файл заявок');
+                    } else {
+                        this.clearFileInfo('ordersFileInfo');
+                    }
+                });
+            }
+
+            // Drag and drop
+            this.setupDragAndDrop();
+        }
+
+        setupModals() {
+            if (this.elements.progressModal) {
+                this.progressModal = new bootstrap.Modal(this.elements.progressModal, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            }
+        }
+
+        async checkWorkTypesStatus() {
+            try {
+                const response = await fetch('/api/work_orders/work-types/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.stats.total > 0) {
+                        this.showNotification(
+                            `В базе данных ${data.stats.total} типов работ. Файл типов работ можно не загружать.`,
+                            'info',
+                            10000
+                        );
+                    } else {
+                        this.showNotification(
+                            'В базе данных нет типов работ. Пожалуйста, загрузите файл с типами работ.',
+                            'warning',
+                            10000
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка проверки статуса типов работ:', error);
+            }
+        }
+
+        async startProcessing() {
+            const workTypesFile = this.elements.workTypesFile?.files[0];
+            const ordersFile = this.elements.ordersFile?.files[0];
+
+            if (!ordersFile) {
+                this.showNotification('Выберите файл с заявками', 'error');
+                return;
+            }
+
+            // Проверка расширений файлов
+            if (workTypesFile && !this.isValidExcelFile(workTypesFile)) {
+                this.showNotification('Файл типов работ должен быть в формате Excel (.xlsx или .xls)', 'error');
+                return;
+            }
+
+            if (!this.isValidExcelFile(ordersFile)) {
+                this.showNotification('Файл заявок должен быть в формате Excel (.xlsx или .xls)', 'error');
+                return;
+            }
+
+            // Блокируем кнопку
+            this.disableSubmitButton(true);
+
+            try {
+                const sessionId = await this.uploadFiles(workTypesFile, ordersFile);
+                this.currentSession = sessionId;
+
+                // Показываем модальное окно прогресса
+                this.showProgressModal();
+
+                // Начинаем отслеживание прогресса
+                this.startProgressTracking();
+
+                // Обновляем URL для возможности перезагрузки страницы
+                this.updateUrlWithSession(sessionId);
+
+            } catch (error) {
+                console.error('Ошибка загрузки файлов:', error);
+                this.showNotification(`Ошибка загрузки: ${error.message}`, 'error');
+                this.disableSubmitButton(false);
+            }
+        }
+
+        async uploadFiles(workTypesFile, ordersFile) {
+            const formData = new FormData();
+
+            // Файл типов работ - необязательный
+            if (workTypesFile) {
+                formData.append('work_types_file', workTypesFile);
+            }
+
+            // Файл заявок - обязательный
+            formData.append('orders_file', ordersFile);
+
+            console.log('Отправка файлов на сервер...');
+
+            const response = await fetch('/api/work_orders/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Ошибка сервера' }));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Ответ сервера:', data);
+            return data.session_id;
+        }
+
+        showProgressModal() {
+            if (this.progressModal) {
+                this.updateProgress(0, 'Начало обработки...', 'Подготовка файлов');
+
+                if (this.currentSession) {
+                    this.elements.sessionIdDisplay.textContent = this.currentSession;
+                }
+
+                this.progressModal.show();
+            }
+        }
+
+        startProgressTracking() {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+            }
+
+            this.intervalId = setInterval(() => {
+                this.checkProgress();
+            }, 1500);
+        }
+
+        async checkProgress() {
+            if (!this.currentSession) return;
+
+            try {
+                console.log('Проверка прогресса для сессии:', this.currentSession);
+                const response = await fetch(`/api/work_orders/status/${this.currentSession}`);
+
+                if (!response.ok) {
+                    console.error('Ошибка получения статуса:', response.status, response.statusText);
+                    throw new Error('Ошибка получения статуса');
+                }
+
+                const data = await response.json();
+                console.log('Данные прогресса:', data);
+
+                // Обновляем прогресс
+                this.updateProgress(data.progress, data.message, `Прогресс: ${data.progress}%`);
+
+                // Проверяем статус
+                if (data.status === 'completed') {
+                    this.onProcessingCompleted(data);
+                } else if (data.status === 'error') {
+                    this.onProcessingError(data.message);
+                }
+
+            } catch (error) {
+                console.error('Ошибка проверки прогресса:', error);
+            }
+        }
+
+        updateProgress(percent, message, details = '') {
+            if (this.elements.progressBar) {
+                this.elements.progressBar.style.width = `${percent}%`;
+                this.elements.progressBar.setAttribute('aria-valuenow', percent);
+                this.elements.progressPercent.textContent = `${percent}%`;
+            }
+
+            if (this.elements.progressMessage) {
+                this.elements.progressMessage.textContent = message;
+            }
+
+            if (this.elements.detailsText && details) {
+                this.elements.detailsText.textContent = details;
+            }
+        }
+
+        async onProcessingCompleted(data) {
+            // Останавливаем отслеживание
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+
+            // Обновляем прогресс
+            this.updateProgress(100, 'Обработка завершена!', 'Формирование результатов...');
+
+            // Закрываем модальное окно через 1.5 секунды
+            setTimeout(async () => {
+                if (this.progressModal) {
+                    this.progressModal.hide();
+                }
+
+                // Получаем результаты
+                await this.loadResults();
+
+                // Сбрасываем кнопку
+                this.disableSubmitButton(false);
+
+                // Показываем уведомление
+                this.showNotification('Обработка заявок завершена успешно!', 'success');
+
+                // Показываем секцию результатов
+                this.elements.resultsSection.classList.remove('d-none');
+
+                // Прокручиваем к результатам
+                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+
+            }, 1500);
+        }
+
+        onProcessingError(errorMessage) {
+            // Останавливаем отслеживание
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+
+            // Обновляем прогресс
+            this.updateProgress(0, 'Ошибка обработки', errorMessage);
+
+            // Закрываем модальное окно через 3 секунды
+            setTimeout(() => {
+                if (this.progressModal) {
+                    this.progressModal.hide();
+                }
+
+                // Показываем ошибку
+                this.showNotification(`Ошибка обработки: ${errorMessage}`, 'error');
+
+                // Сбрасываем кнопку
+                this.disableSubmitButton(false);
+
+            }, 3000);
+        }
+
+        async loadResults() {
+            if (!this.currentSession) return;
+
+            console.log('Загрузка результатов для сессии:', this.currentSession);
+
+            try {
+                // Получаем статус сессии (включая статистику)
+                console.log('1. Получение статуса сессии...');
+                const statusResponse = await fetch(`/api/work_orders/status/${this.currentSession}`);
+
+                if (!statusResponse.ok) {
+                    const errorText = await statusResponse.text();
+                    console.error('Ошибка получения статуса:', errorText);
+                    throw new Error(`Не удалось получить статус: ${statusResponse.status}`);
+                }
+
+                const statusData = await statusResponse.json();
+                console.log('Статус данных:', statusData);
+                this.currentStats = statusData.stats;
+
+                // Получаем список файлов
+                console.log('2. Получение списка файлов...');
+                const filesResponse = await fetch(`/api/work_orders/files/${this.currentSession}`);
+
+                if (!filesResponse.ok) {
+                    const errorText = await filesResponse.text();
+                    console.error('Ошибка получения файлов:', errorText);
+                    throw new Error('Не удалось получить список файлов');
+                }
+
+                const filesData = await filesResponse.json();
+                console.log('Данные файлов:', filesData);
+
+                // Получаем региональные данные
+                console.log('3. Получение региональных данных...');
+                let regionalData = null;
+
+                try {
+                    const regionalResponse = await fetch(`/api/work_orders/regional-data/${this.currentSession}`);
+
+                    if (regionalResponse.ok) {
+                        regionalData = await regionalResponse.json();
+                        console.log('Региональные данные:', regionalData);
+                        this.regionalData = regionalData.regional_data || regionalData;
+                    } else {
+                        console.warn('Не удалось получить региональные данные:', regionalResponse.status);
+                    }
+                } catch (regionalError) {
+                    console.warn('Не удалось получить региональные данные:', regionalError);
+                }
+
+                // Отображаем результаты
+                console.log('4. Отображение результатов...');
+                this.showResults(filesData, regionalData);
+
+            } catch (error) {
+                console.error('Ошибка загрузки результатов:', error);
+                this.showNotification(`Ошибка загрузки результатов: ${error.message}`, 'error');
+            }
+        }
+
+        showResults(filesData, regionalData) {
+            if (!this.elements.resultsContent) return;
+
+            // Очищаем предыдущие результаты
+            this.elements.resultsContent.innerHTML = '';
+
+            // Создаем контейнер для результатов
+            const resultsContainer = document.createElement('div');
+            resultsContainer.className = 'results-container';
+
+            // Статистика проверки
+            const statsHtml = this.createStatsHtml();
+            resultsContainer.innerHTML += statsHtml;
+
+            // Секция файлов
+            const filesHtml = this.createFilesHtml(filesData);
+            resultsContainer.innerHTML += filesHtml;
+
+            // Секция региональных данных (если есть)
+            if (regionalData && (regionalData.regional_data || Object.keys(regionalData).length > 0)) {
+                const regionsHtml = this.createRegionsHtml(regionalData);
+                resultsContainer.innerHTML += regionsHtml;
+            } else if (regionalData && regionalData.regional_data === null) {
+                // Если региональные данные null, значит нет не-ТО нарушений
+                resultsContainer.innerHTML += `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Нет не-ТО заявок с нарушениями для группировки по регионам.
+                    </div>
+                `;
+            }
+
+            this.elements.resultsContent.appendChild(resultsContainer);
+        }
+
+        createStatsHtml() {
+            if (!this.currentStats) return '';
+
+            const totalViolations = (this.currentStats.to_violations || 0) + (this.currentStats.non_to_violations || 0);
+
+            return `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-dark">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Статистика проверки</h5>
+                                    <button class="btn btn-sm btn-outline-dark" onclick="workOrderProcessor.showDetailedStats()">
+                                        <i class="fas fa-expand-alt me-1"></i>Подробнее
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3 mb-3">
+                                        <div class="display-5 text-primary mb-2">${this.currentStats.total_checked || 0}</div>
+                                        <p class="text-muted mb-0">Всего проверено</p>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="display-5 ${totalViolations > 0 ? 'text-danger' : 'text-success'} mb-2">${totalViolations}</div>
+                                        <p class="text-muted mb-0">Нарушений</p>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="display-5 text-danger mb-2">${this.currentStats.to_violations || 0}</div>
+                                        <p class="text-muted mb-0">ТО заявки</p>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <div class="display-5 text-warning mb-2">${this.currentStats.non_to_violations || 0}</div>
+                                        <p class="text-muted mb-0">Не-ТО заявки</p>
+                                    </div>
+                                </div>
+                                ${this.currentStats.matched_types_list && this.currentStats.matched_types_list.length > 0 ? `
+                                    <div class="mt-3">
+                                        <small class="text-muted d-block mb-1">Сопоставлено типов работ:</small>
+                                        <div class="small">${this.currentStats.matched_types_list.slice(0, 5).join(', ')}${this.currentStats.matched_types_list.length > 5 ? '...' : ''}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        createFilesHtml(filesData) {
+            if (!filesData || !filesData.files || filesData.files.length === 0) {
+                return `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Файлы результатов не найдены
+                    </div>
+                `;
+            }
+
+            let filesHtml = `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-download me-2"></i>Скачать результаты</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="filesList">
+            `;
+
+            filesData.files.forEach(file => {
+                const icon = this.getFileIcon(file.type);
+                const color = this.getFileColor(file.type);
+                const description = this.getFileDescription(file.type);
+
+                filesHtml += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-${color.split('-')[1]}">
+                            <div class="card-body">
+                                <div class="d-flex align-items-start">
+                                    <div class="me-3">
+                                        <i class="${icon} fa-2x ${color}"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="card-title mb-1">${file.name}</h6>
+                                        <p class="card-text small text-muted mb-2">${description}</p>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-sm btn-${color.split('-')[1]}"
+                                                    onclick="workOrderProcessor.downloadFile('${file.type}', '${file.region || ''}')">
+                                                <i class="fas fa-download me-1"></i>Скачать
+                                            </button>
+                                            ${file.type === 'regional' && file.region ? `
+                                                <button class="btn btn-sm btn-outline-${color.split('-')[1]}"
+                                                        onclick="workOrderProcessor.showCopyModal('${file.region}')">
+                                                    <i class="fas fa-copy me-1"></i>Копировать
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            filesHtml += `
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return filesHtml;
+        }
+
+        createRegionsHtml(regionalData) {
+    const data = regionalData.regional_data || regionalData;
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return '';
+
+    // Проверяем, что это объект с регионами
+    const regions = Object.keys(data).filter(region => {
+        const regionData = data[region];
+        return Array.isArray(regionData) && regionData.length > 0;
+    });
+
+    if (regions.length === 0) return '';
+
+    // Порядок приоритета регионов
+    const priorityOrder = [
+        'Кременчук і Горішні Плавні (окремо)',
+        'Полтавська область',
+        'Одеська область',
+        'Миколаївська область',
+        'Черкаська область',
+        'Кіровоградська область'
+    ];
+
+    // Остальные регионы
+    const otherRegions = regions.filter(r => !priorityOrder.includes(r));
+    const sortedRegions = [...priorityOrder.filter(r => regions.includes(r)), ...otherRegions.sort()];
+
+    let regionsHtml = `
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>Заявки по регионам</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="regionsList">
+    `;
+
+    sortedRegions.forEach(region => {
+        const orders = data[region];
+        const count = orders.length;
+
+        regionsHtml += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">${region}</h6>
+                            <span class="badge bg-primary rounded-pill">${count}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-2">Примеры заявок:</small>
+                            <ul class="list-unstyled mb-0 small">
+                                ${orders.slice(0, 3).map(order => {
+                                    // Безопасное получение данных из объекта
+                                    const orderNumber = order.Номер_заявки || order['Номер заявки'] || 'Не указан';
+                                    const city = order.Город || order.город || 'Не указан';
+                                    return `
+                                        <li class="mb-1">
+                                            <i class="fas fa-hashtag text-muted me-1"></i>
+                                            ${orderNumber} - ${city}
+                                        </li>`;
+                                }).join('')}
+                                ${count > 3 ? `
+                                    <li class="text-muted">
+                                        <i class="fas fa-ellipsis-h me-1"></i>
+                                        ... и еще ${count - 3} заявок
+                                    </li>
+                                ` : ''}
+                            </ul>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick="workOrderProcessor.showRegionDetails('${region}')">
+                                <i class="fas fa-eye me-1"></i>Просмотреть
+                            </button>
+                            <button class="btn btn-sm btn-outline-success"
+                                    onclick="workOrderProcessor.showCopyModal('${region}')">
+                                <i class="fas fa-copy me-1"></i>Копировать текст
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    regionsHtml += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return regionsHtml;
+}
+
+        async downloadFile(fileType, region = '') {
+            if (!this.currentSession) return;
+
+            try {
+                let url = `/api/work_orders/download/${this.currentSession}/${fileType}`;
+                if (region) {
+                    url += `?region=${encodeURIComponent(region)}`;
+                }
+
+                console.log('Скачивание файла:', url);
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Ошибка скачивания файла:', errorText);
+                    throw new Error('Ошибка скачивания файла');
+                }
+
+                // Получаем имя файла из заголовков
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = `${fileType}_${new Date().toISOString().split('T')[0]}`;
+
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+
+                // Создаем ссылку для скачивания
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                this.showNotification(`Файл "${filename}" скачивается...`, 'success');
+
+            } catch (error) {
+                console.error('Ошибка скачивания:', error);
+                this.showNotification(`Ошибка скачивания: ${error.message}`, 'error');
+            }
+        }
+
+        async showCopyModal(region) {
+            if (!this.currentSession) return;
+
+            try {
+                const response = await fetch(`/api/work_orders/copy-text/${this.currentSession}/${encodeURIComponent(region)}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Ошибка получения текста:', errorText);
+                    throw new Error('Ошибка получения текста');
+                }
+
+                const data = await response.json();
+
+                // Обновляем модальное окно
+                document.getElementById('copyModalTitle').textContent = `Текст для копирования - ${region}`;
+                this.elements.copyTextArea.value = data.text || 'Текст не найден';
+
+                // Выделяем текст
+                this.elements.copyTextArea.select();
+
+                // Показываем модальное окно
+                const copyModal = new bootstrap.Modal(this.elements.copyModal);
+                copyModal.show();
+
+            } catch (error) {
+                console.error('Ошибка показа модального окна:', error);
+                this.showNotification(`Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        async showRegionDetails(region) {
+            if (!this.currentSession) return;
+
+            try {
+                const response = await fetch(`/api/work_orders/copy-text/${this.currentSession}/${encodeURIComponent(region)}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка получения данных');
+                }
+
+                const data = await response.json();
+
+                // Формируем содержимое модального окна
+                let content = `
+                    <div class="alert alert-primary">
+                        <h5 class="mb-2">${region}</h5>
+                        <p class="mb-0">
+                            <i class="fas fa-file-alt me-2"></i>
+                            Всего заявок: <strong>${data.orders_count || 0}</strong>
+                        </p>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-copy me-2"></i>Текст для копирования:</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre class="bg-light p-3 border rounded" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap;">${data.text || 'Нет данных'}</pre>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" onclick="copyToClipboardFromTextarea('${encodeURIComponent(data.text || '')}')">
+                            <i class="fas fa-copy me-2"></i>Копировать весь текст
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="workOrderProcessor.downloadFile('regional', '${region}')">
+                            <i class="fas fa-download me-2"></i>Скачать файл региона
+                        </button>
+                    </div>
+                `;
+
+                this.elements.regionContent.innerHTML = content;
+                document.getElementById('regionModalTitle').textContent = `Детали по региону: ${region}`;
+
+                const regionModal = new bootstrap.Modal(this.elements.regionModal);
+                regionModal.show();
+
+            } catch (error) {
+                this.showNotification(`Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        showDetailedStats() {
+            if (!this.currentStats) return;
+
+            let statsHtml = `
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Показатель</th>
+                                <th>Значение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Всего проверено заявок</strong></td>
+                                <td>${this.currentStats.total_checked || 0}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Сопоставлено типов работ</strong></td>
+                                <td>${this.currentStats.matched_types || 0}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Не сопоставлено типов работ</strong></td>
+                                <td>${this.currentStats.unmatched_types || 0}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Пропущено заявок</strong></td>
+                                <td>${this.currentStats.skipped_orders || 0}</td>
+                            </tr>
+                            <tr class="table-danger">
+                                <td><strong>Заявок с нарушениями</strong></td>
+                                <td>${this.currentStats.violation_orders || 0}</td>
+                            </tr>
+                            <tr class="table-danger">
+                                <td><strong>ТО заявки с нарушениями</strong></td>
+                                <td>${this.currentStats.to_violations || 0}</td>
+                            </tr>
+                            <tr class="table-warning">
+                                <td><strong>Не-ТО заявки с нарушениями</strong></td>
+                                <td>${this.currentStats.non_to_violations || 0}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            if (this.currentStats.matched_types_list && this.currentStats.matched_types_list.length > 0) {
+                statsHtml += `
+                    <div class="alert alert-success mt-3">
+                        <h6><i class="fas fa-check-circle me-2"></i>Сопоставленные типы работ:</h6>
+                        <div class="mt-2">${this.currentStats.matched_types_list.join(', ')}</div>
+                    </div>
+                `;
+            }
+
+            if (this.currentStats.unmatched_types_list && this.currentStats.unmatched_types_list.length > 0) {
+                statsHtml += `
+                    <div class="alert alert-warning mt-3">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Не сопоставленные типы работ:</h6>
+                        <div class="mt-2">${this.currentStats.unmatched_types_list.join(', ')}</div>
+                    </div>
+                `;
+            }
+
+            this.elements.statsContent.innerHTML = statsHtml;
+
+            const statsModal = new bootstrap.Modal(this.elements.statsModal);
+            statsModal.show();
+        }
+
+        getFileIcon(fileType) {
+            const icons = {
+                'highlighted': 'fas fa-highlighter',
+                'to_violations': 'fas fa-exclamation-circle',
+                'non_to_violations': 'fas fa-file-alt',
+                'regional': 'fas fa-map-marker-alt',
+                'summary': 'fas fa-chart-pie',
+                'original': 'fas fa-file-excel'
+            };
+            return icons[fileType] || 'fas fa-file';
+        }
+
+        getFileColor(fileType) {
+            const colors = {
+                'highlighted': 'text-warning',
+                'to_violations': 'text-danger',
+                'non_to_violations': 'text-info',
+                'regional': 'text-success',
+                'summary': 'text-primary',
+                'original': 'text-secondary'
+            };
+            return colors[fileType] || 'text-secondary';
+        }
+
+        getFileDescription(fileType) {
+            const descriptions = {
+                'highlighted': 'Исходный файл с выделенными нарушениями',
+                'to_violations': 'Список ТО заявок с нарушениями',
+                'non_to_violations': 'Общий список не-ТО заявок',
+                'regional': 'Файл с заявками по региону',
+                'summary': 'Сводный отчет по проверке',
+                'original': 'Оригинальный файл'
+            };
+            return descriptions[fileType] || 'Файл результатов';
+        }
+
+        showFileInfo(elementId, file, label = 'Файл') {
+            const element = this.elements[elementId];
+            if (!element) return;
+
+            const fileSize = this.formatFileSize(file.size);
+            const modifiedDate = new Date(file.lastModified).toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            element.innerHTML = `
+                <div class="alert alert-success p-2 mb-0">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-file-excel text-success me-3 fs-4"></i>
+                        <div class="flex-grow-1">
+                            <strong class="d-block mb-1">${label}</strong>
+                            <div class="small text-muted">
+                                <div class="d-flex justify-content-between">
+                                    <span>${file.name}</span>
+                                    <span>${fileSize}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Изменен: ${modifiedDate}</span>
+                                    <span>Сессия: ${this.currentSession ? this.currentSession.substring(0, 8) + '...' : '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        clearFileInfo(elementId) {
+            const element = this.elements[elementId];
+            if (element) {
+                element.innerHTML = '';
+            }
+        }
+
+        setupDragAndDrop() {
+            const dropAreas = [
+                this.elements.workTypesFile?.parentElement,
+                this.elements.ordersFile?.parentElement
+            ].filter(area => area);
+
+            dropAreas.forEach(dropArea => {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, () => {
+                        dropArea.classList.add('border-primary', 'border-2', 'bg-light');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, () => {
+                        dropArea.classList.remove('border-primary', 'border-2', 'bg-light');
+                    });
+                });
+
+                dropArea.addEventListener('drop', (e) => {
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        const file = files[0];
+                        const inputId = dropArea.querySelector('input[type="file"]')?.id;
+
+                        if (inputId === 'workTypesFile') {
+                            this.setFileInput(this.elements.workTypesFile, file);
+                            this.showFileInfo('workTypesFileInfo', file, 'Файл типов работ');
+                        } else if (inputId === 'ordersFile') {
+                            this.setFileInput(this.elements.ordersFile, file);
+                            this.showFileInfo('ordersFileInfo', file, 'Файл заявок');
+                        }
+
+                        this.showNotification(`Файл "${file.name}" загружен`, 'success');
+                    }
+                });
+            });
+        }
+
+        setFileInput(inputElement, file) {
+            if (!inputElement) return;
+
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            inputElement.files = dataTransfer.files;
+
+            // Триггерим событие change
+            const event = new Event('change', { bubbles: true });
+            inputElement.dispatchEvent(event);
+        }
+
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Б';
+
+            const k = 1024;
+            const sizes = ['Б', 'КБ', 'МБ', 'ГБ'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        isValidExcelFile(file) {
+            const fileName = file.name.toLowerCase();
+            return fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+        }
+
+        showNotification(message, type = 'info', duration = 5000) {
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-danger',
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
+
+            const icon = {
+                'success': 'fas fa-check-circle',
+                'error': 'fas fa-exclamation-circle',
+                'warning': 'fas fa-exclamation-triangle',
+                'info': 'fas fa-info-circle'
+            }[type] || 'fas fa-info-circle';
+
+            const container = document.getElementById('notification-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `toast show`;
+            alertDiv.style.minWidth = '300px';
+            alertDiv.innerHTML = `
+                <div class="toast-header ${alertClass} text-white">
+                    <i class="${icon} me-2"></i>
+                    <strong class="me-auto">${type === 'error' ? 'Ошибка' : type === 'warning' ? 'Внимание' : type === 'success' ? 'Успешно' : 'Информация'}</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            `;
+
+            container.appendChild(alertDiv);
+
+            // Автоматическое скрытие
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    const bsToast = new bootstrap.Toast(alertDiv);
+                    bsToast.hide();
+                    setTimeout(() => alertDiv.remove(), 150);
+                }
+            }, duration);
+
+            // Обработка закрытия
+            alertDiv.addEventListener('hidden.bs.toast', () => {
+                alertDiv.remove();
+            });
+        }
+
+        disableSubmitButton(disabled) {
+            if (this.elements.submitBtn) {
+                this.elements.submitBtn.disabled = disabled;
+                if (disabled) {
+                    this.elements.submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Обработка...';
+                    this.elements.submitBtn.classList.remove('btn-primary');
+                    this.elements.submitBtn.classList.add('btn-secondary');
+                } else {
+                    this.elements.submitBtn.innerHTML = '<i class="fas fa-play me-2"></i>Начать проверку';
+                    this.elements.submitBtn.classList.remove('btn-secondary');
+                    this.elements.submitBtn.classList.add('btn-primary');
+                }
+            }
+        }
+
+        updateUrlWithSession(sessionId) {
+            const url = new URL(window.location);
+            url.searchParams.set('session', sessionId);
+            window.history.pushState({}, '', url);
+        }
+
+        checkSessionFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session');
+
+            if (sessionId) {
+                this.currentSession = sessionId;
+                this.loadResults();
+                this.elements.resultsSection.classList.remove('d-none');
+            }
+        }
+    }
+
+    // Глобальные функции
+
+    async function downloadWorkTypes() {
+        try {
+            const response = await fetch('/api/work_orders/work-types/export');
+            if (!response.ok) {
+                throw new Error('Ошибка экспорта типов работ');
+            }
+
+            // Создаем ссылку для скачивания
+            const blob = await response.blob();
+            const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '')
+                || `work_types_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            showTempNotification('Экспорт типов работ начат', 'success');
+
+        } catch (error) {
+            showTempNotification(`Ошибка экспорта: ${error.message}`, 'error');
+        }
+    }
+
+    function copyToClipboard() {
+        const textarea = document.getElementById('copyTextArea');
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+
+        try {
+            const successful = document.execCommand('copy');
+            const msg = successful ? 'Текст скопирован в буфер обмена!' : 'Ошибка копирования';
+
+            showTempNotification(msg, 'success');
+
+        } catch (err) {
+            showTempNotification('Ошибка копирования. Используйте Ctrl+C', 'error');
+        }
+    }
+
+    function copyToClipboardFromTextarea(encodedText) {
+        const text = decodeURIComponent(encodedText);
+
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = text;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            const msg = successful ? 'Текст скопирован в буфер обмена!' : 'Ошибка копирования';
+            showTempNotification(msg, 'success');
+        } catch (err) {
+            showTempNotification('Ошибка копирования. Используйте Ctrl+C', 'error');
+        } finally {
+            document.body.removeChild(tempTextArea);
+        }
+    }
+
+    function showTempNotification(message, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'error': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+
+        const notification = document.createElement('div');
+        notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed bottom-0 end-0 m-3`;
+        notification.style.zIndex = '1060';
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation' : type === 'warning' ? 'exclamation-triangle' : 'info'}-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 3000);
+    }
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        window.workOrderProcessor = new WorkOrderProcessor();
+
+        // Инициализация всех Bootstrap компонентов
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

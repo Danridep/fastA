@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+
+{% block title %}Адреса - Excel Web App{% endblock %}
+{% block page_title %}Управление адресами{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Адреса доставки</h4>
+                    <button class="btn btn-light" onclick="showAddModal()">
+                        <i class="fas fa-plus me-2"></i>Добавить адрес
+                    </button>
+                </div>
+                <div class="card-body">
+                    <!-- Фильтры -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fas fa-search me-2"></i>Поиск:</label>
+                            <input type="text" class="form-control" id="searchInput" 
+                                   placeholder="Поиск по адресу, ФИО или телефону..." onkeyup="filterTable()">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="btn-group w-100">
+                                <button class="btn btn-outline-primary" onclick="loadAddresses()">
+                                    <i class="fas fa-sync-alt me-2"></i>Обновить
+                                </button>
+                                <button class="btn btn-outline-success" onclick="exportToExcel()">
+                                    <i class="fas fa-file-excel me-2"></i>Экспорт
+                                </button>
+                                <button class="btn btn-outline-info" onclick="showImportModal()">
+                                    <i class="fas fa-file-import me-2"></i>Импорт
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Таблица -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="addressesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="50" ><p style="color: black;">ID</p></th>
+                                    <th width="80"><p style="color: black;">НП</p></th>
+                                    <th><p style="color: black;">Адрес</p></th>
+                                    <th><p style="color: black;">ФИО получателя</p></th>
+                                    <th><p style="color: black;">Телефон</p></th>
+                                    <th width="150"><p style="color: black;">Действия</p></th>
+                                </tr>
+                            </thead>
+                            <tbody id="addressesBody">
+                                <tr id="loadingRow">
+                                    <td colspan="6" class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Загрузка...</span>
+                                        </div>
+                                        <p class="mt-2">Загрузка данных...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-3 text-end">
+                        <small class="text-muted" id="itemCount">Загрузка...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления/редактирования -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Добавить адрес</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editId">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="editNpNumber" class="form-label">Номер НП</label>
+                            <input type="text" class="form-control" id="editNpNumber" 
+                                   placeholder="16">
+                        </div>
+                        <div class="col-md-9 mb-3">
+                            <label for="editAddress" class="form-label">Адрес *</label>
+                            <input type="text" class="form-control" id="editAddress" required
+                                   placeholder="Кропивницкий, Маланюка, 1А">
+                            <div class="invalid-feedback">Введите адрес</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editContactPerson" class="form-label">ФИО получателя *</label>
+                            <input type="text" class="form-control" id="editContactPerson" required
+                                   placeholder="Чорний Александр Викторович">
+                            <div class="invalid-feedback">Введите ФИО</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editPhone" class="form-label">Телефон</label>
+                            <input type="text" class="form-control" id="editPhone" 
+                                   placeholder="(067)5211993">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveAddress()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно импорта -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Импорт адресов из Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Формат Excel файла должен содержать колонки: 
+                    <strong>НП, Адрес, ФИО, Телефон</strong>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Выберите Excel файл:</label>
+                    <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls">
+                </div>
+                <div class="progress mb-3 d-none" id="importProgress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="importAddresses()">Импорт</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    let currentEditId = null;
+    let addressesData = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAddresses();
+    });
+
+    function loadAddresses() {
+        showLoading();
+        
+        fetch('/api/addresses')
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                addressesData = data.data;
+                renderTable(addressesData);
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification(`Ошибка загрузки: ${error.message}`, 'error');
+            });
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('addressesBody');
+        tbody.innerHTML = '';
+        
+        if (data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="fas fa-map-marked-alt fa-2x mb-3"></i>
+                        <p>Нет данных об адресах</p>
+                    </td>
+                </tr>
+            `;
+            document.getElementById('itemCount').textContent = '0 записей';
+            return;
+        }
+        
+        data.forEach(item => {
+            const row = `
+                <tr>
+                    <td class="fw-bold">${item.id}</td>
+                    <td>
+                        ${item.np_number ? `<span class="badge bg-info">${item.np_number}</span>` : '-'}
+                    </td>
+                    <td>
+                        <strong>${item.address}</strong>
+                    </td>
+                    <td>${item.contact_person}</td>
+                    <td>
+                        ${item.phone ? `
+                            <a href="tel:${item.phone}" class="text-decoration-none">
+                                <i class="fas fa-phone me-1"></i>${item.phone}
+                            </a>
+                        ` : '-'}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editItem(${item.id})" 
+                                    title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteItem(${item.id})" 
+                                    title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button class="btn btn-outline-success" onclick="copyToClipboard(${item.id})" 
+                                    title="Копировать">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+        
+        document.getElementById('itemCount').textContent = `${data.length} адресов`;
+    }
+
+    function filterTable() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const filteredData = addressesData.filter(item => 
+            item.address.toLowerCase().includes(searchTerm) || 
+            item.contact_person.toLowerCase().includes(searchTerm) ||
+            (item.phone && item.phone.toLowerCase().includes(searchTerm)) ||
+            (item.np_number && item.np_number.toLowerCase().includes(searchTerm))
+        );
+        renderTable(filteredData);
+    }
+
+    function showAddModal() {
+        currentEditId = null;
+        document.getElementById('modalTitle').textContent = 'Добавить адрес';
+        document.getElementById('editId').value = '';
+        document.getElementById('editNpNumber').value = '';
+        document.getElementById('editAddress').value = '';
+        document.getElementById('editContactPerson').value = '';
+        document.getElementById('editPhone').value = '';
+        
+        document.getElementById('editForm').classList.remove('was-validated');
+        
+        const modal = new bootstrap.Modal(document.getElementById('editModal'));
+        modal.show();
+    }
+
+    function editItem(id) {
+        const item = addressesData.find(i => i.id === id);
+        if (item) {
+            currentEditId = id;
+            document.getElementById('modalTitle').textContent = 'Редактировать адрес';
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editNpNumber').value = item.np_number || '';
+            document.getElementById('editAddress').value = item.address;
+            document.getElementById('editContactPerson').value = item.contact_person;
+            document.getElementById('editPhone').value = item.phone || '';
+            
+            document.getElementById('editForm').classList.remove('was-validated');
+            
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        }
+    }
+
+    function saveAddress() {
+        const form = document.getElementById('editForm');
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+        
+        const npNumber = document.getElementById('editNpNumber').value.trim();
+        const address = document.getElementById('editAddress').value.trim();
+        const contactPerson = document.getElementById('editContactPerson').value.trim();
+        const phone = document.getElementById('editPhone').value.trim();
+        
+        if (!address || !contactPerson) {
+            showNotification('Заполните обязательные поля', 'error');
+            return;
+        }
+        
+        const data = {
+            np_number: npNumber,
+            address: address,
+            contact_person: contactPerson,
+            phone: phone
+        };
+        
+        const url = currentEditId ? `/api/addresses/${currentEditId}` : '/api/addresses';
+        const method = currentEditId ? 'PUT' : 'POST';
+        
+        showLoading();
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Ошибка сохранения');
+            return response.json();
+        })
+        .then(() => {
+            hideLoading();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+            modal.hide();
+            loadAddresses();
+            showNotification(currentEditId ? 'Адрес обновлен' : 'Адрес добавлен', 'success');
+        })
+        .catch(error => {
+            hideLoading();
+            showNotification(`Ошибка: ${error.message}`, 'error');
+        });
+    }
+
+    function deleteItem(id) {
+        confirmAction(
+            'Удаление адреса',
+            'Вы уверены, что хотите удалить этот адрес?',
+            function() {
+                showLoading();
+                
+                fetch(`/api/addresses/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Ошибка удаления');
+                    return response.json();
+                })
+                .then(() => {
+                    hideLoading();
+                    loadAddresses();
+                    showNotification('Адрес удален', 'success');
+                })
+                .catch(error => {
+                    hideLoading();
+                    showNotification(`Ошибка: ${error.message}`, 'error');
+                });
+            }
+        );
+    }
+
+    function copyToClipboard(id) {
+        const item = addressesData.find(i => i.id === id);
+        if (item) {
+            const text = `Адрес: ${item.address}\nФИО: ${item.contact_person}\nТелефон: ${item.phone || 'не указан'}`;
+            navigator.clipboard.writeText(text)
+                .then(() => showNotification('Адрес скопирован в буфер обмена', 'success'))
+                .catch(() => showNotification('Не удалось скопировать адрес', 'error'));
+        }
+    }
+
+    function exportToExcel() {
+        showLoading();
+        
+        fetch('/api/addresses')
+            .then(response => response.json())
+            .then(data => {
+                // Создаем CSV
+                let csv = 'НП;Адрес;ФИО получателя;Телефон\n';
+                data.data.forEach(item => {
+                    csv += `${item.np_number || ''};"${item.address}";"${item.contact_person}";"${item.phone || ''}"\n`;
+                });
+                
+                // Создаем и скачиваем файл
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `адреса_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                hideLoading();
+                showNotification('Экспорт завершен', 'success');
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification(`Ошибка экспорта: ${error.message}`, 'error');
+            });
+    }
+
+    function showImportModal() {
+        const modal = new bootstrap.Modal(document.getElementById('importModal'));
+        modal.show();
+    }
+
+    function importAddresses() {
+        const fileInput = document.getElementById('importFile');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showNotification('Выберите файл для импорта', 'error');
+            return;
+        }
+        
+        // TODO: Реализовать импорт из Excel
+        showNotification('Импорт будет реализован в следующей версии', 'info');
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+        modal.hide();
+    }
+
+    function showLoading() {
+        let spinner = document.getElementById('loadingSpinner');
+        if (!spinner) {
+            spinner = document.createElement('div');
+            spinner.id = 'loadingSpinner';
+            spinner.className = 'spinner-container';
+            spinner.innerHTML = '<div class="spinner"></div>';
+            document.body.appendChild(spinner);
+        }
+    }
+
+    function hideLoading() {
+        document.getElementById('loadingSpinner')?.remove();
+    }
+</script>
+{% endblock %}
+{% endblock %}

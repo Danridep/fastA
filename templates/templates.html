@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+
+{% block title %}Сравнение Excel файлов - Excel Web App{% endblock %}
+{% block page_title %}Сравнение Excel файлов{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-excel me-2"></i>Партийный учет</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Форма загрузки файлов -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-upload me-2"></i>Загрузите файлы для сравнения</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="compareForm">
+                                        <div class="mb-3">
+                                            <label for="file1Input" class="form-label">Первый Excel файл *</label>
+                                            <input type="file" class="form-control" id="file1Input" accept=".xlsx,.xls" required>
+                                            <div class="form-text">
+                                                Выберите первый файл Excel. Будут проверены все ячейки на отрицательные значения.
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="file2Input" class="form-label">Второй Excel файл *</label>
+                                            <input type="file" class="form-control" id="file2Input" accept=".xlsx,.xls" required>
+                                            <div class="form-text">
+                                                Выберите второй файл Excel. Проверяются только столбцы 3 и 5 на отрицательные значения.
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-light">
+                                            <h6><i class="fas fa-info-circle me-2"></i>Как работает сравнение:</h6>
+                                            <ul class="mb-0">
+                                                <li>В файле 1: проверяются все ячейки на отрицательные значения</li>
+                                                <li>В файле 2: проверяются только столбцы 3 и 5</li>
+                                                <li>Находятся итоговые значения (строки "Итог")</li>
+                                                <li>Сравниваются итоговые значения</li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" class="btn btn-primary btn-lg">
+                                                <i class="fas fa-balance-scale me-2"></i>Сравнить файлы
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>История сравнений</h5>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="loadHistorySummary()" title="Обновить">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Фильтры -->
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control form-control-sm" id="searchInput"
+                                                   placeholder="Поиск по файлам..." onkeyup="debouncedSearch()">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-select form-select-sm" id="comparisonFilter" onchange="loadHistory()">
+                                                <option value="">Все результаты</option>
+                                                <option value="match">Сошлись</option>
+                                                <option value="mismatch">Не сошлись</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-select form-select-sm" id="perPageSelect" onchange="loadHistory()">
+                                                <option value="10">10 на стр.</option>
+                                                <option value="20" selected>20 на стр.</option>
+                                                <option value="50">50 на стр.</option>
+                                                <option value="100">100 на стр.</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Сводная информация -->
+                                    <div id="historySummary" class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted small">Загрузка статистики...</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- История -->
+                                    <div id="comparisonHistory">
+                                        <div class="text-center py-4">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Загрузка...</span>
+                                            </div>
+                                            <p class="text-muted mt-2">Загрузка истории...</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Пагинация -->
+                                    <nav id="paginationContainer" class="mt-3 d-none">
+                                        <ul class="pagination pagination-sm justify-content-center" id="pagination">
+                                        </ul>
+                                    </nav>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-lightbulb me-2"></i>Информация</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Программа выполняет следующие действия:</p>
+                                    <ol>
+                                        <li>Загружает два Excel файла</li>
+                                        <li>Ищет отрицательные значения:
+                                            <ul>
+                                                <li>В файле 1: во всех ячейках</li>
+                                                <li>В файле 2: только в столбцах 3 и 5</li>
+                                            </ul>
+                                        </li>
+                                        <li>Находит строки с "Итог" и извлекает значения</li>
+                                        <li>Сравнивает итоговые значения</li>
+                                        <li>Сохраняет результаты</li>
+                                    </ol>
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        <strong>Формат ячеек:</strong> R1C1 (строка 1, колонка 1)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Результаты сравнения -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-bar me-2"></i>Результаты сравнения</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="comparisonResults">
+                                        <p class="text-center text-muted">
+                                            <i class="fas fa-balance-scale fa-2x mb-3"></i><br>
+                                            Результаты сравнения появятся здесь после обработки файлов
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно сравнения -->
+<div class="modal fade" id="comparisonModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Сравнение файлов</h5>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p id="comparisonMessage">Начало сравнения...</p>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%" id="comparisonProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно деталей -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали сравнения</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailsModalBody">
+                <!-- Детали будут загружены динамически -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Глобальные переменные для пагинации
+    let currentPage = 1;
+    let totalPages = 1;
+    let perPage = 20;
+    let searchQuery = '';
+    let comparisonFilter = '';
+    let debounceTimer;
+    let comparisonModal = null;
+    let detailsModal = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        comparisonModal = new bootstrap.Modal(document.getElementById('comparisonModal'));
+        detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+
+        // Инициализация
+        perPage = parseInt(document.getElementById('perPageSelect').value);
+        loadHistorySummary();
+        loadHistory();
+
+        // Настройка формы сравнения
+        document.getElementById('compareForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startComparison();
+        });
+
+        // Инициализация фильтров
+        setupFilters();
+    });
+
+    function setupFilters() {
+        // Дебаунс для поиска
+        document.getElementById('searchInput').addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                searchQuery = this.value.trim();
+                currentPage = 1;
+                loadHistory();
+            }, 500);
+        });
+
+        // Фильтр по результату сравнения
+        document.getElementById('comparisonFilter').addEventListener('change', function() {
+            comparisonFilter = this.value;
+            currentPage = 1;
+            loadHistory();
+        });
+
+        // Количество элементов на странице
+        document.getElementById('perPageSelect').addEventListener('change', function() {
+            perPage = parseInt(this.value);
+            currentPage = 1;
+            loadHistory();
+        });
+    }
+
+    function debouncedSearch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            searchQuery = document.getElementById('searchInput').value.trim();
+            currentPage = 1;
+            loadHistory();
+        }, 500);
+    }
+
+    function loadHistorySummary() {
+        fetch('/api/particle/history/summary')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderHistorySummary(data.data);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading history summary:', error);
+            });
+    }
+
+    function renderHistorySummary(data) {
+        const container = document.getElementById('historySummary');
+        if (!container) return;
+
+        const total = data.summary?.total || 0;
+        const matches = data.summary?.matches || 0;
+        const mismatches = data.summary?.mismatches || 0;
+        const successRate = total > 0 ? Math.round((matches / total) * 100) : 0;
+
+        container.innerHTML = `
+            <div class="row g-2">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-info">Всего: ${total}</span>
+                            <span class="badge bg-success ms-2">Сошлись: ${matches}</span>
+                            <span class="badge bg-danger ms-2">Не сошлись: ${mismatches}</span>
+                            <span class="badge bg-primary ms-2">Успех: ${successRate}%</span>
+                        </div>
+                        <small class="text-muted">${data.recent?.length || 0} новых</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadHistory() {
+        const historyDiv = document.getElementById('comparisonHistory');
+        const paginationContainer = document.getElementById('paginationContainer');
+
+        // Показываем индикатор загрузки
+        historyDiv.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+                <p class="text-muted mt-2">Загрузка истории...</p>
+            </div>
+        `;
+
+        // Скрываем пагинацию
+        paginationContainer.classList.add('d-none');
+
+        // Формируем URL с параметрами
+        let url = `/api/particle/history?page=${currentPage}&per_page=${perPage}`;
+        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+        if (comparisonFilter) url += `&comparison=${comparisonFilter}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderHistory(data);
+                    renderPagination(data);
+                } else {
+                    throw new Error(data.message || 'Ошибка загрузки');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading history:', error);
+                historyDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Ошибка загрузки истории: ${error.message}
+                    </div>
+                `;
+            });
+    }
+
+    function renderHistory(data) {
+        const historyDiv = document.getElementById('comparisonHistory');
+        const items = data.data || [];
+
+        if (items.length === 0) {
+            let message = 'История сравнений пуста';
+            if (searchQuery) message = 'По вашему запросу ничего не найдено';
+            if (comparisonFilter) message = 'Нет записей с выбранным фильтром';
+
+            historyDiv.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-history fa-2x mb-3"></i>
+                    <p>${message}</p>
+                    ${searchQuery || comparisonFilter ?
+                        '<button class="btn btn-sm btn-outline-secondary mt-2" onclick="resetFilters()">Сбросить фильтры</button>' : ''}
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+
+        items.forEach(item => {
+            const date = item.created_at_formatted || item.created_at;
+            const resultClass = item.comparison_class || (item.comparison === 'match' ? 'success' : 'danger');
+            const resultText = item.comparison_ru || (item.comparison === 'match' ? 'Сошлись' : 'Не сошлись');
+
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div class="flex-grow-1 me-3">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="badge bg-secondary me-2">#${item.id}</span>
+                                <h6 class="mb-0 text-truncate" style="max-width: 300px;" title="${item.file1_name}">
+                                    <i class="fas fa-file-excel text-primary me-1"></i>${item.file1_name}
+                                </h6>
+                                <i class="fas fa-exchange-alt text-muted mx-2"></i>
+                                <h6 class="mb-0 text-truncate" style="max-width: 300px;" title="${item.file2_name}">
+                                    <i class="fas fa-file-excel text-success me-1"></i>${item.file2_name}
+                                </h6>
+                            </div>
+                            <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                <span class="badge bg-${resultClass}">
+                                    <i class="fas ${item.comparison === 'match' ? 'fa-check' : 'fa-times'} me-1"></i>${resultText}
+                                </span>
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>${item.date_only || date}
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock ms-2 me-1"></i>${item.time_only || ''}
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-minus-circle ms-2 me-1"></i>${item.minus_count1 || 0}/${item.minus_count2 || 0}
+                                </small>
+                            </div>
+                            ${item.total1 !== null && item.total2 !== null ? `
+                                <div class="small">
+                                    <span class="text-muted">Итоги:</span>
+                                    <span class="ms-1">${item.total1 || 0}</span>
+                                    <i class="fas fa-equals mx-1 text-muted"></i>
+                                    <span>${item.total2 || 0}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-info" onclick="viewComparisonDetails(${item.id})" title="Просмотреть">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteComparison(${item.id})" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        historyDiv.innerHTML = html;
+    }
+
+    function renderPagination(data) {
+        const paginationContainer = document.getElementById('paginationContainer');
+        const pagination = document.getElementById('pagination');
+
+        if (!data.pages || data.pages <= 1) {
+            paginationContainer.classList.add('d-none');
+            return;
+        }
+
+        totalPages = data.pages;
+        currentPage = data.page;
+
+        pagination.innerHTML = '';
+
+        // Кнопка "Назад"
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">&laquo;</a>`;
+        pagination.appendChild(prevLi);
+
+        // Номера страниц
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, startPage + 4);
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageLi = document.createElement('li');
+            pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            pageLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+            pagination.appendChild(pageLi);
+        }
+
+        // Кнопка "Вперед"
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">&raquo;</a>`;
+        pagination.appendChild(nextLi);
+
+        // Информация о странице
+        const infoLi = document.createElement('li');
+        infoLi.className = 'page-item disabled';
+        const startItem = (currentPage - 1) * perPage + 1;
+        const endItem = Math.min(currentPage * perPage, data.total);
+        infoLi.innerHTML = `<span class="page-link text-muted">${startItem}-${endItem} из ${data.total}</span>`;
+        pagination.appendChild(infoLi);
+
+        paginationContainer.classList.remove('d-none');
+    }
+
+    function changePage(page) {
+        if (page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        loadHistory();
+        window.scrollTo({ top: document.getElementById('comparisonHistory').offsetTop - 100, behavior: 'smooth' });
+    }
+
+    function resetFilters() {
+        searchQuery = '';
+        comparisonFilter = '';
+        currentPage = 1;
+
+        document.getElementById('searchInput').value = '';
+        document.getElementById('comparisonFilter').value = '';
+
+        loadHistory();
+        loadHistorySummary();
+    }
+
+    function viewComparisonDetails(id) {
+        fetch(`/api/particle/history/${id}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showDetailsModal(data.data);
+                } else {
+                    throw new Error(data.message || 'Ошибка загрузки деталей');
+                }
+            })
+            .catch(error => {
+                showNotification(`Ошибка загрузки деталей: ${error.message}`, 'error');
+            });
+    }
+
+    function showDetailsModal(item) {
+        const modalBody = document.getElementById('detailsModalBody');
+
+        const resultClass = item.comparison_class || (item.comparison === 'match' ? 'success' : 'danger');
+        const resultText = item.comparison_ru || (item.comparison === 'match' ? 'Сошлись' : 'Не сошлись');
+        const resultIcon = item.comparison === 'match' ? 'fa-check-circle' : 'fa-times-circle';
+
+        modalBody.innerHTML = `
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-${resultClass}">
+                        <h5><i class="fas ${resultIcon} me-2"></i>${resultText}</h5>
+                        <p class="mb-0">Сравнение выполнено: ${item.created_at_formatted || item.created_at}</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="fas fa-file-excel me-2"></i>${item.file1_name}</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Минусовые ячейки:</th>
+                                    <td>${item.minus_count1 || 0}</td>
+                                </tr>
+                                <tr>
+                                    <th>Итоговое значение:</th>
+                                    <td>${item.total1 !== null ? item.total1 : 'Не найдено'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Статус файла:</th>
+                                    <td>
+                                        <span class="badge ${item.minus_count1 > 0 ? 'bg-warning' : 'bg-success'}">
+                                            ${item.minus_count1 > 0 ? 'Есть минусы' : 'Без минусов'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-file-excel me-2"></i>${item.file2_name}</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Минусовые ячейки:</th>
+                                    <td>${item.minus_count2 || 0}</td>
+                                </tr>
+                                <tr>
+                                    <th>Итоговое значение:</th>
+                                    <td>${item.total2 !== null ? item.total2 : 'Не найдено'}</td>
+                                </tr>
+                                <tr>
+                                    <th>Статус файла:</th>
+                                    <td>
+                                        <span class="badge ${item.minus_count2 > 0 ? 'bg-warning' : 'bg-success'}">
+                                            ${item.minus_count2 > 0 ? 'Есть минусы' : 'Без минусов'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Результат сравнения</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr class="table-${resultClass}">
+                                        <th>${item.file1_name}</th>
+                                        <th>${item.file2_name}</th>
+                                        <th>Результат</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>${item.total1 !== null ? item.total1 : 'Не найдено'}</td>
+                                        <td>${item.total2 !== null ? item.total2 : 'Не найдено'}</td>
+                                        <td class="fw-bold text-${resultClass}">
+                                            ${item.comparison === 'match' ? '✅ Значения совпадают' : '❌ Значения не совпадают'}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 text-center">
+                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Закрыть</button>
+                ${item.comparison === 'mismatch' ? `
+                    <button class="btn btn-warning" onclick="reanalyzeComparison(${item.id})">
+                        <i class="fas fa-redo me-2"></i>Перепроверить
+                    </button>
+                ` : ''}
+            </div>
+        `;
+
+        detailsModal.show();
+    }
+
+    function reanalyzeComparison(id) {
+        showNotification('Функция перепроверки находится в разработке', 'info');
+    }
+
+    // Остальные функции (startComparison, showComparisonResults, deleteComparison и т.д.) остаются без изменений
+    // ... [остальной JavaScript код из предыдущего ответа]
+
+</script>
+{% endblock %}

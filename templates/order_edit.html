@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование заказа - Excel Web App{% endblock %}
+{% block page_title %}Редактирование заказа{% endblock %}
+
+{% block extra_css %}
+<style>
+    .address-item {
+        cursor: pointer;
+        transition: all 0.3s;
+        border-left: 4px solid transparent;
+    }
+    .address-item:hover {
+        background-color: #f8f9fa;
+        border-left-color: #0d6efd;
+    }
+    .address-item.active {
+        background-color: #e7f1ff;
+        border-left-color: #0d6efd;
+    }
+    .quantity-input {
+        text-align: center;
+        min-width: 80px;
+    }
+    .quantity-input.is-empty {
+        color: #6c757d;
+        font-style: italic;
+    }
+    .quantity-input.is-filled {
+        color: #198754;
+        font-weight: bold;
+    }
+    .changed {
+        animation: pulse 0.5s;
+    }
+    .quick-filled {
+        animation: highlight 1s;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    @keyframes highlight {
+        0% { background-color: #e3f2fd; }
+        100% { background-color: transparent; }
+    }
+    #loading-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: white;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    #main-container {
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    #main-container.loaded {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4" id="order-edit-container">
+    <!-- Заглушка пока загружается -->
+    <div id="loading-container">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        <h4 class="mt-3">Загрузка данных заказа...</h4>
+        <p class="text-muted">Пожалуйста, подождите</p>
+        <div class="mt-3">
+            <small class="text-muted" id="loading-details"></small>
+        </div>
+    </div>
+
+    <!-- Основной контейнер (скрыт пока загружается) -->
+    <div id="main-container" class="d-none">
+        <div class="row">
+            <!-- Список адресов -->
+            <div class="col-md-3">
+                <div class="card shadow h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Адреса</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush" id="addressesList">
+                            <!-- Адреса загружаются через JavaScript -->
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" id="exportBtn">
+                                <i class="fas fa-file-excel me-2"></i>Экспорт в Excel
+                            </button>
+                            <button class="btn btn-outline-primary" id="saveBtn">
+                                <i class="fas fa-save me-2"></i>Сохранить изменения
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таблица редактирования -->
+            <div class="col-md-9">
+                <div class="card shadow h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0" id="currentAddressTitle">
+                            <i class="fas fa-edit me-2"></i>Выберите адрес для редактирования
+                        </h5>
+                        <div>
+                            <span class="badge bg-light text-dark me-2" id="itemCount">0 позиций</span>
+                            <button class="btn btn-sm btn-light" id="refreshBtn">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="editTable">
+                                <thead class="table-light">
+                                    <tr id="tableHeaders">
+                                        <th width="50">№</th>
+                                        <!-- Заголовки загружаются через JavaScript -->
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <!-- Данные загружаются через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text">Быстрое заполнение</span>
+                                    <input type="number" class="form-control" id="quickFill"
+                                           placeholder="Количество" min="0" value="1">
+                                    <button class="btn btn-outline-primary" id="quickFillBtn">
+                                        <i class="fas fa-bolt"></i> Заполнить
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button class="btn btn-outline-danger" id="clearAllBtn">
+                                    <i class="fas fa-eraser me-2"></i>Очистить все
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div id="orderStats"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Экспорт в Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Будет создан Excel файл со всеми заполненными данными.
+                    Строки с пустым количеством не будут включены в файл.
+                </div>
+                <div class="progress mb-3 d-none" id="exportProgress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="startExportBtn">
+                    <i class="fas fa-file-excel me-2"></i>Экспортировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Ошибка</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+                <div class="mt-3">
+                    <button class="btn btn-outline-light" onclick="location.reload()">
+                        <i class="fas fa-redo me-1"></i>Перезагрузить страницу
+                    </button>
+                    <button class="btn btn-outline-light ms-2" onclick="window.location.href='/'">
+                        <i class="fas fa-home me-1"></i>На главную
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Контейнер для уведомлений -->
+<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
+<!-- Скрытые данные -->
+<input type="hidden" id="sessionId" value="{{ session_id }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='js/order.js') }}"></script>
+<script>
+// Глобальные вспомогательные функции
+function showNotification(message, type = 'info') {
+    const alertClass = {
+        'success': 'alert-success',
+        'error': 'alert-danger',
+        'warning': 'alert-warning',
+        'info': 'alert-info'
+    }[type] || 'alert-info';
+
+    const container = document.getElementById('notification-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+    alertDiv.style.minWidth = '300px';
+    alertDiv.style.marginBottom = '10px';
+
+    const icon = type === 'success' ? 'fa-check-circle' :
+                 type === 'error' ? 'fa-exclamation-circle' :
+                 type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+
+    alertDiv.innerHTML = `
+        <i class="fas ${icon} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    container.appendChild(alertDiv);
+
+    // Автоматически скрываем через 5 секунд
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }
+    }, 5000);
+}
+
+function showError(message) {
+    console.error(message);
+
+    // Скрываем спиннер загрузки
+    document.getElementById('loading-container').classList.add('d-none');
+
+    // Показываем ошибку в модальном окне
+    document.getElementById('errorMessage').textContent = message;
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+}
+
+function showLoading(message = 'Загрузка...') {
+    const loadingDetails = document.getElementById('loading-details');
+    if (loadingDetails) {
+        loadingDetails.textContent = message;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM загружен, инициализация заказа...');
+
+    // Получаем session_id из скрытого поля
+    const sessionId = document.getElementById('sessionId')?.value;
+    console.log('Полученный session_id:', sessionId);
+
+    // Проверяем валидность sessionId
+    if (!sessionId || sessionId === 'undefined' || sessionId === 'null' || sessionId === 'None') {
+        showError('Некорректный идентификатор сессии. Пожалуйста, создайте новый заказ.');
+        return;
+    }
+
+    // Показываем детали загрузки
+    showLoading('Подключение к базе данных...');
+
+    // Инициализируем менеджер заказа
+    try {
+        console.log('Инициализация OrderManager с sessionId:', sessionId);
+        initOrder(sessionId, 'КЦ');
+    } catch (error) {
+        console.error('Ошибка инициализации OrderManager:', error);
+        showError(`Ошибка инициализации: ${error.message}`);
+    }
+});
+
+// Экспортируем функции для глобального использования
+window.showNotification = showNotification;
+window.showError = showError;
+window.showLoading = showLoading;
+</script>
+{% endblock %}

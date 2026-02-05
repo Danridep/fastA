@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Создание заказа - Excel Web App{% endblock %}
+{% block page_title %}Создание заказа {{ order_type }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas {{ 'fa-shopping-cart' if order_type == 'КЦ' else 'fa-tools' }} me-2"></i>
+                        Создание заказа {{ order_type }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Информация о шаблоне -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Информация:</strong> Создание нового заказа {{ order_type }}. 
+                                Система автоматически создаст таблицу со всеми адресами и номенклатурой.
+                                Вы сможете заполнить количество для каждого адреса.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопка создания -->
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <div class="card border-primary">
+                                <div class="card-body">
+                                    <i class="fas fa-file-excel fa-4x text-primary mb-3"></i>
+                                    <h3>Создать новый заказ {{ order_type }}</h3>
+                                    <p class="text-muted">
+                                        Нажмите кнопку ниже, чтобы начать создание заказа.
+                                        Система загрузит все адреса и номенклатуру из базы данных.
+                                    </p>
+                                    
+                                    <button class="btn btn-primary btn-lg mt-3" onclick="createOrderSession()">
+                                        <i class="fas fa-plus-circle me-2"></i>Создать заказ
+                                    </button>
+                                    
+                                    <div class="mt-4">
+                                        <h5>Что будет создано:</h5>
+                                        <ul class="list-group list-group-flush text-start">
+                                            <li class="list-group-item">
+                                                <i class="fas fa-check text-success me-2"></i>
+                                                Загрузка всех адресов из базы данных
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fas fa-check text-success me-2"></i>
+                                                Загрузка номенклатуры {{ order_type }}
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fas fa-check text-success me-2"></i>
+                                                Создание таблицы для заполнения количеств
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fas fa-check text-success me-2"></i>
+                                                Возможность экспорта в Excel
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- История заказов -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-history me-2"></i>Недавние заказы</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recentOrders">
+                                        <p class="text-center text-muted">Загрузка истории заказов...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания -->
+<div class="modal fade" id="creatingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создание заказа</h5>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p id="creatingMessage">Подготовка данных...</p>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%" id="creatingProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Контейнер для уведомлений -->
+<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const orderType = "{{ order_type }}";
+    let creatingModal = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        creatingModal = new bootstrap.Modal(document.getElementById('creatingModal'));
+        loadRecentOrders();
+    });
+
+    function createOrderSession() {
+        console.log(`Создание заказа типа: ${orderType}`);
+
+        // Показать модальное окно с прогрессом
+        document.getElementById('creatingMessage').textContent = 'Подготовка данных...';
+        document.getElementById('creatingProgress').style.width = '10%';
+        creatingModal.show();
+
+        // Симуляция прогресса
+        let progress = 10;
+        const progressInterval = setInterval(() => {
+            progress += 5;
+            if (progress <= 90) {
+                document.getElementById('creatingProgress').style.width = progress + '%';
+            }
+        }, 200);
+
+        // Отправка запроса на создание сессии
+        fetch(`/api/orders/create/${orderType}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            clearInterval(progressInterval);
+
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                });
+            }
+
+            document.getElementById('creatingProgress').style.width = '100%';
+            return response.json();
+        })
+        .then(data => {
+            console.log('Создание заказа успешно:', data);
+            document.getElementById('creatingMessage').textContent = 'Заказ создан! Перенаправление...';
+
+            if (data.success && data.data && data.data.session_id) {
+                // Перенаправляем на страницу редактирования
+                setTimeout(() => {
+                    creatingModal.hide();
+                    window.location.href = data.data.redirect_url || `/page/order/edit/${data.data.session_id}`;
+                }, 1000);
+            } else {
+                throw new Error('Неверный формат ответа от сервера');
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка создания заказа:', error);
+            clearInterval(progressInterval);
+            creatingModal.hide();
+
+            let errorMessage = 'Ошибка создания заказа';
+            if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Ошибка сети. Проверьте подключение к интернету.';
+            } else if (error.message.includes('404')) {
+                errorMessage = 'Сервер не найден. Проверьте адрес сервера.';
+            } else if (error.message.includes('500')) {
+                errorMessage = 'Ошибка сервера. Попробуйте позже.';
+            } else {
+                errorMessage = error.message;
+            }
+
+            showNotification(errorMessage, 'error');
+        });
+    }
+
+    function loadRecentOrders() {
+        // TODO: Загрузка истории заказов
+        // В реальном приложении здесь бы был запрос к API
+        setTimeout(() => {
+            document.getElementById('recentOrders').innerHTML = `
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Заказ ${orderType} от сегодня</h6>
+                            <small>Только что</small>
+                        </div>
+                        <p class="mb-1">В процессе создания</p>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Заказ ${orderType} от вчера</h6>
+                            <small>1 день назад</small>
+                        </div>
+                        <p class="mb-1">5 адресов, 12 позиций</p>
+                    </div>
+                </div>
+            `;
+        }, 500);
+    }
+
+    function showNotification(message, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'error': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+
+        const container = document.getElementById('notification-container');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' :
+                             type === 'error' ? 'fa-exclamation-circle' :
+                             type === 'warning' ? 'fa-exclamation-triangle' :
+                             'fa-info-circle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        container.appendChild(alertDiv);
+
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %}

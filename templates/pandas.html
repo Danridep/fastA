@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Pandas анализ - Excel Web App{% endblock %}
+{% block page_title %}Pandas анализ данных{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>Перенос списаний</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Форма загрузки -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-upload me-2"></i>Загрузка файла для анализа</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="uploadForm">
+                                        <div class="mb-3">
+                                            <label for="monthInput" class="form-label">Месяц для анализа *</label>
+                                            <select class="form-select" id="monthInput" required>
+                                                <option value="">Выберите месяц</option>
+                                                <option value="1">Январь</option>
+                                                <option value="2">Февраль</option>
+                                                <option value="3">Март</option>
+                                                <option value="4">Апрель</option>
+                                                <option value="5">Май</option>
+                                                <option value="6">Июнь</option>
+                                                <option value="7">Июль</option>
+                                                <option value="8">Август</option>
+                                                <option value="9">Сентябрь</option>
+                                                <option value="10">Октябрь</option>
+                                                <option value="11">Ноябрь</option>
+                                                <option value="12">Декабрь</option>
+                                            </select>
+                                            <div class="form-text">
+                                                Укажите месяц, за который нужно провести анализ
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="fileInput" class="form-label">Excel файл *</label>
+                                            <input type="file" class="form-control" id="fileInput" accept=".xlsx,.xls" required>
+                                            <div class="form-text">
+                                                Выберите Excel файл с данными для анализа.
+                                                Файл должен содержать колонки: "Родитель", "Дата статуса", "Количество", "Стоимость (с НДС)"
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="alert alert-light">
+                                            <h6><i class="fas fa-info-circle me-2"></i>Требования к файлу:</h6>
+                                            <ul class="mb-0">
+                                                <li>Формат Excel (.xlsx или .xls)</li>
+                                                <li>Данные начинаются с 8 строки</li>
+                                                <li>Последние 2 строки - подвал</li>
+                                                <li>Обязательные колонки указаны выше</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" class="btn btn-primary btn-lg">
+                                                <i class="fas fa-chart-bar me-2"></i>Запустить анализ
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-history me-2"></i>История анализов</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="analysisHistory">
+                                        <p class="text-center text-muted">Загрузка истории...</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-lightbulb me-2"></i>Как работает анализ</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Pandas анализ выполняет следующие действия:</p>
+                                    <ol>
+                                        <li>Загружает Excel файл, пропуская служебные строки</li>
+                                        <li>Фильтрует данные по выбранному месяцу</li>
+                                        <li>Группирует данные по филиалам ("Родитель")</li>
+                                        <li>Суммирует количество и стоимость</li>
+                                        <li>Добавляет общий итог</li>
+                                        <li>Сохраняет результат в новый Excel файл</li>
+                                    </ol>
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        <strong>Результат:</strong> Excel файл с таблицей анализа, готовый к использованию
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Результаты анализа -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie me-2"></i>Результаты анализа</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="analysisResults">
+                                        <p class="text-center text-muted">
+                                            <i class="fas fa-chart-bar fa-2x mb-3"></i><br>
+                                            Результаты анализа появятся здесь после обработки файла
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно анализа -->
+<div class="modal fade" id="analysisModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Анализ данных</h5>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p id="analysisMessage">Начало анализа...</p>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%" id="analysisProgress"></div>
+                    </div>
+                    <div class="alert alert-info d-none" id="analysisDetails">
+                        <small><i class="fas fa-info-circle me-1"></i> <span id="detailsText"></span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    let analysisModal = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        analysisModal = new bootstrap.Modal(document.getElementById('analysisModal'));
+        loadAnalysisHistory();
+        
+        // Настройка формы
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startAnalysis();
+        });
+    });
+
+    function startAnalysis() {
+        const month = document.getElementById('monthInput').value;
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        
+        if (!month || !file) {
+            showNotification('Заполните все обязательные поля', 'error');
+            return;
+        }
+        
+        // Показать модальное окно
+        document.getElementById('analysisMessage').textContent = 'Подготовка к анализу...';
+        document.getElementById('analysisProgress').style.width = '10%';
+        document.getElementById('analysisDetails').classList.add('d-none');
+        analysisModal.show();
+        
+        // Создаем FormData
+        const formData = new FormData();
+        formData.append('month', month);
+        formData.append('file', file);
+        
+        // Симуляция прогресса
+        let progress = 10;
+        const messages = [
+            'Загрузка файла...',
+            'Чтение данных Excel...',
+            'Парсинг дат...',
+            'Фильтрация по месяцу...',
+            'Группировка данных...',
+            'Расчет сумм...',
+            'Формирование отчета...',
+            'Сохранение результатов...'
+        ];
+        
+        let messageIndex = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            if (progress <= 90) {
+                document.getElementById('analysisProgress').style.width = progress + '%';
+                
+                if (messageIndex < messages.length && progress > (messageIndex + 1) * 10) {
+                    document.getElementById('analysisMessage').textContent = messages[messageIndex];
+                    document.getElementById('detailsText').textContent = `Шаг ${messageIndex + 1} из ${messages.length}`;
+                    document.getElementById('analysisDetails').classList.remove('d-none');
+                    messageIndex++;
+                }
+            }
+        }, 500);
+        
+        // Отправка запроса
+        fetch('/api/pandas/analyze', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            clearInterval(progressInterval);
+            document.getElementById('analysisProgress').style.width = '100%';
+            document.getElementById('analysisMessage').textContent = 'Анализ завершен!';
+            
+            if (!response.ok) {
+                throw new Error(`Ошибка анализа: ${response.status}`);
+            }
+            
+            return response.blob();
+        })
+        .then(blob => {
+            // Создаем ссылку для скачивания
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `анализ_${month}_месяц_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            // Показываем результаты
+            setTimeout(() => {
+                analysisModal.hide();
+                showResults(month, file.name);
+                loadAnalysisHistory();
+                showNotification('Анализ завершен! Файл скачан.', 'success');
+            }, 1000);
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            analysisModal.hide();
+            showNotification(`Ошибка анализа: ${error.message}`, 'error');
+        });
+    }
+
+    function showResults(month, filename) {
+        const monthNames = [
+            'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+            'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+        ];
+        
+        const resultsDiv = document.getElementById('analysisResults');
+        resultsDiv.innerHTML = `
+            <div class="alert alert-success">
+                <h5><i class="fas fa-check-circle me-2"></i>Анализ успешно завершен!</h5>
+                <p>Файл <strong>${filename}</strong> проанализирован за ${monthNames[month - 1]} месяц.</p>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6><i class="fas fa-file-alt me-2"></i>Детали анализа</h6>
+                            <ul class="mb-0">
+                                <li>Исходный файл: <strong>${filename}</strong></li>
+                                <li>Месяц анализа: <strong>${monthNames[month - 1]}</strong></li>
+                                <li>Дата выполнения: <strong>${new Date().toLocaleDateString('ru-RU')}</strong></li>
+                                <li>Результат: <strong>Excel файл скачан</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6><i class="fas fa-download me-2"></i>Следующие шаги</h6>
+                            <p>Файл с результатами автоматически скачан. Вы можете:</p>
+                            <ul>
+                                <li>Открыть файл для просмотра результатов</li>
+                                <li>Импортировать данные в другую систему</li>
+                                <li>Поделиться результатами с коллегами</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button class="btn btn-outline-primary" onclick="startAnalysis()">
+                    <i class="fas fa-redo me-2"></i>Запустить новый анализ
+                </button>
+            </div>
+        `;
+    }
+
+    function loadAnalysisHistory() {
+        // TODO: Загрузка истории анализов из API
+        // В реальном приложении здесь бы был запрос к серверу
+        
+        setTimeout(() => {
+            document.getElementById('analysisHistory').innerHTML = `
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Анализ за Ноябрь 2023</h6>
+                            <small>Сегодня</small>
+                        </div>
+                        <p class="mb-1">Файл: data_export.xlsx</p>
+                        <small class="text-muted">5 филиалов, 124 записи</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Анализ за Октябрь 2023</h6>
+                            <small>Неделю назад</small>
+                        </div>
+                        <p class="mb-1">Файл: october_data.xlsx</p>
+                        <small class="text-muted">8 филиалов, 256 записей</small>
+                    </div>
+                </div>
+            `;
+        }, 500);
+    }
+
+    function showNotification(message, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'error': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+        
+        const container = document.getElementById('notification-container');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        container.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %}
+{% endblock %}

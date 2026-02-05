@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Страница не найдена - Excel Web App{% endblock %}
+{% block page_title %}Страница не найдена{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body text-center py-5">
+                    <div class="error-container">
+                        <i class="fas fa-exclamation-triangle fa-5x text-warning mb-4"></i>
+                        <h1 class="display-1 fw-bold text-primary">404</h1>
+                        <h2 class="mb-4">Страница не найдена</h2>
+                        <p class="lead mb-4">
+                            Извините, запрашиваемая страница не существует или была перемещена.
+                        </p>
+                        
+                        <div class="row justify-content-center">
+                            <div class="col-md-8">
+                                <div class="card border-info mb-4">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Возможные причины:</h5>
+                                        <ul class="text-start">
+                                            <li>Страница была удалена или перемещена</li>
+                                            <li>Вы ввели неверный URL адрес</li>
+                                            <li>Произошла ошибка при переходе по ссылке</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="btn-group" role="group">
+                            <a href="/" class="btn btn-primary btn-lg">
+                                <i class="fas fa-home me-2"></i>На главную
+                            </a>
+                            <button onclick="history.back()" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-arrow-left me-2"></i>Назад
+                            </button>
+                        </div>
+                        
+                        <div class="mt-5">
+                            <h5>Попробуйте перейти на одну из этих страниц:</h5>
+                            <div class="row mt-3">
+                                <div class="col-md-3 mb-2">
+                                    <a href="/page/nomenclature" class="btn btn-outline-info w-100">
+                                        <i class="fas fa-boxes me-2"></i>Номенклатура
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="/page/addresses" class="btn btn-outline-success w-100">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Адреса
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="/page/templates" class="btn btn-outline-warning w-100">
+                                        <i class="fas fa-file-alt me-2"></i>Шаблоны
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="/page/pandas" class="btn btn-outline-purple w-100">
+                                        <i class="fas fa-chart-line me-2"></i>Анализ
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+</style>
+{% endblock %}
