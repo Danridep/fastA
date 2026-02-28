@@ -1,640 +1,737 @@
 {% extends "base.html" %}
+{% block title %}Шаблоны - Excel Web App{% endblock %}
+{% block page_title %}Управление шаблонами{% endblock %}
 
-{% block title %}Сравнение Excel файлов - Excel Web App{% endblock %}
-{% block page_title %}Сравнение Excel файлов{% endblock %}
+{% block extra_css %}
+<style>
+/* ── Вкладки ───────────────────────────────────── */
+.vtab-nav { display:flex; gap:4px; border-bottom:2px solid #dee2e6; margin-bottom:24px; }
+.vtab-btn {
+  padding:10px 22px; border:none; background:none; color:#6b7280;
+  font-size:14px; font-weight:500; cursor:pointer;
+  border-bottom:3px solid transparent; margin-bottom:-2px;
+  border-radius:6px 6px 0 0; transition:all .15s;
+  display:flex; align-items:center; gap:7px;
+}
+.vtab-btn:hover { background:#f3f4f6; color:#111; }
+.vtab-btn.active { color:#0d6efd; border-bottom-color:#0d6efd; background:#eff6ff; }
+.vtab-pane { display:none; }
+.vtab-pane.active { display:block; }
+
+/* ── Редактор маппинга ─────────────────────────── */
+.mapping-layout {
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:0;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  overflow:hidden;
+  height:calc(100vh - 310px);
+  min-height:480px;
+}
+
+/* Левая панель — шаблоны / адреса */
+.mp-left {
+  background:#f9fafb;
+  border-right:1px solid #e5e7eb;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.mp-left-head {
+  padding:14px 16px 10px;
+  border-bottom:1px solid #e5e7eb;
+  background:#fff; flex-shrink:0;
+}
+.mp-left-head h6 { margin:0 0 8px; font-size:12px; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.5px; }
+.mp-left-body { flex:1; overflow-y:auto; scrollbar-width:thin; }
+
+.tpl-item {
+  padding:12px 16px; cursor:pointer; border-left:3px solid transparent;
+  transition:all .12s; display:flex; flex-direction:column; gap:2px;
+}
+.tpl-item:hover { background:#f0f4ff; }
+.tpl-item.active { background:#eff6ff; border-left-color:#3b82f6; }
+.tpl-item-name { font-size:13px; font-weight:600; color:#111; }
+.tpl-item-type { font-size:11px; }
+
+.addr-item {
+  padding:10px 16px; cursor:pointer; border-left:3px solid transparent;
+  transition:all .12s; display:flex; align-items:center; gap:10px;
+}
+.addr-item:hover { background:#f0f4ff; }
+.addr-item.active { background:#eff6ff; border-left-color:#3b82f6; }
+.addr-item-text { flex:1; min-width:0; }
+.addr-item-name { font-size:12px; font-weight:500; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.addr-item-sub  { font-size:10px; color:#9ca3af; }
+.addr-count-pill {
+  font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px;
+  flex-shrink:0; white-space:nowrap;
+}
+.acp-set { background:#dcfce7; color:#166534; }
+.acp-all { background:#f3f4f6; color:#9ca3af; border:1px dashed #d1d5db; }
+
+/* Правая панель — номенклатуры */
+.mp-right {
+  display:flex; flex-direction:column; overflow:hidden; background:#fff;
+}
+.mp-right-head {
+  padding:14px 20px 12px;
+  border-bottom:1px solid #f3f4f6; flex-shrink:0;
+}
+.mp-right-title { font-size:15px; font-weight:700; color:#111; margin-bottom:2px; }
+.mp-right-sub   { font-size:12px; color:#6b7280; }
+.mp-right-toolbar {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 20px; border-bottom:1px solid #f3f4f6; flex-shrink:0;
+}
+.mp-count { margin-left:auto; font-size:12px; color:#6b7280; }
+.mp-count strong { color:#111; }
+.mp-right-body {
+  flex:1; overflow-y:auto; padding:12px 20px; scrollbar-width:thin;
+}
+.mp-right-footer {
+  padding:12px 20px; border-top:1px solid #e5e7eb;
+  display:flex; align-items:center; gap:12px; background:#fafafa; flex-shrink:0;
+}
+.mp-hint { font-size:12px; color:#9ca3af; flex:1; }
+
+.mp-placeholder {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; color:#d1d5db; gap:10px; text-align:center;
+}
+.mp-placeholder i { font-size:36px; }
+.mp-placeholder p { font-size:13px; color:#9ca3af; margin:0; }
+
+/* Чекбокс-айтем номенклатуры */
+.ncheck-item {
+  display:flex; align-items:center; gap:12px; padding:9px 10px;
+  border-radius:7px; cursor:pointer; user-select:none; transition:background .1s;
+}
+.ncheck-item:hover { background:#f9fafb; }
+.ncheck-item.on { background:#f0fdf4; }
+.ncheck-item input[type=checkbox] { width:16px; height:16px; accent-color:#22c55e; cursor:pointer; flex-shrink:0; }
+.ncheck-name    { font-size:13px; color:#111; flex:1; }
+.ncheck-comment { font-size:11px; color:#9ca3af; display:block; margin-top:1px; }
+
+.nom-sep {
+  font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:#9ca3af; padding:10px 0 4px; border-bottom:1px solid #f3f4f6; margin-bottom:4px;
+}
+
+/* Секция выбора шаблона */
+.tpl-select-section {
+  background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px;
+  padding:20px; margin-bottom:20px;
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-info text-white">
-                    <h4 class="mb-0"><i class="fas fa-file-excel me-2"></i>Партийный учет</h4>
-                </div>
-                <div class="card-body">
-                    <!-- Форма загрузки файлов -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-upload me-2"></i>Загрузите файлы для сравнения</h5>
-                                </div>
-                                <div class="card-body">
-                                    <form id="compareForm">
-                                        <div class="mb-3">
-                                            <label for="file1Input" class="form-label">Первый Excel файл *</label>
-                                            <input type="file" class="form-control" id="file1Input" accept=".xlsx,.xls" required>
-                                            <div class="form-text">
-                                                Выберите первый файл Excel. Будут проверены все ячейки на отрицательные значения.
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="file2Input" class="form-label">Второй Excel файл *</label>
-                                            <input type="file" class="form-control" id="file2Input" accept=".xlsx,.xls" required>
-                                            <div class="form-text">
-                                                Выберите второй файл Excel. Проверяются только столбцы 3 и 5 на отрицательные значения.
-                                            </div>
-                                        </div>
-
-                                        <div class="alert alert-light">
-                                            <h6><i class="fas fa-info-circle me-2"></i>Как работает сравнение:</h6>
-                                            <ul class="mb-0">
-                                                <li>В файле 1: проверяются все ячейки на отрицательные значения</li>
-                                                <li>В файле 2: проверяются только столбцы 3 и 5</li>
-                                                <li>Находятся итоговые значения (строки "Итог")</li>
-                                                <li>Сравниваются итоговые значения</li>
-                                            </ul>
-                                        </div>
-
-                                        <div class="d-grid gap-2">
-                                            <button type="submit" class="btn btn-primary btn-lg">
-                                                <i class="fas fa-balance-scale me-2"></i>Сравнить файлы
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="card mb-4">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>История сравнений</h5>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="loadHistorySummary()" title="Обновить">
-                                        <i class="fas fa-sync-alt"></i>
-                                    </button>
-                                </div>
-                                <div class="card-body">
-                                    <!-- Фильтры -->
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-md-6">
-                                            <input type="text" class="form-control form-control-sm" id="searchInput"
-                                                   placeholder="Поиск по файлам..." onkeyup="debouncedSearch()">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <select class="form-select form-select-sm" id="comparisonFilter" onchange="loadHistory()">
-                                                <option value="">Все результаты</option>
-                                                <option value="match">Сошлись</option>
-                                                <option value="mismatch">Не сошлись</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <select class="form-select form-select-sm" id="perPageSelect" onchange="loadHistory()">
-                                                <option value="10">10 на стр.</option>
-                                                <option value="20" selected>20 на стр.</option>
-                                                <option value="50">50 на стр.</option>
-                                                <option value="100">100 на стр.</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <!-- Сводная информация -->
-                                    <div id="historySummary" class="mb-3">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="text-muted small">Загрузка статистики...</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- История -->
-                                    <div id="comparisonHistory">
-                                        <div class="text-center py-4">
-                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                                <span class="visually-hidden">Загрузка...</span>
-                                            </div>
-                                            <p class="text-muted mt-2">Загрузка истории...</p>
-                                        </div>
-                                    </div>
-
-                                    <!-- Пагинация -->
-                                    <nav id="paginationContainer" class="mt-3 d-none">
-                                        <ul class="pagination pagination-sm justify-content-center" id="pagination">
-                                        </ul>
-                                    </nav>
-                                </div>
-                            </div>
-
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-lightbulb me-2"></i>Информация</h5>
-                                </div>
-                                <div class="card-body">
-                                    <p>Программа выполняет следующие действия:</p>
-                                    <ol>
-                                        <li>Загружает два Excel файла</li>
-                                        <li>Ищет отрицательные значения:
-                                            <ul>
-                                                <li>В файле 1: во всех ячейках</li>
-                                                <li>В файле 2: только в столбцах 3 и 5</li>
-                                            </ul>
-                                        </li>
-                                        <li>Находит строки с "Итог" и извлекает значения</li>
-                                        <li>Сравнивает итоговые значения</li>
-                                        <li>Сохраняет результаты</li>
-                                    </ol>
-                                    <div class="alert alert-success">
-                                        <i class="fas fa-check-circle me-2"></i>
-                                        <strong>Формат ячеек:</strong> R1C1 (строка 1, колонка 1)
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Результаты сравнения -->
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-chart-bar me-2"></i>Результаты сравнения</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div id="comparisonResults">
-                                        <p class="text-center text-muted">
-                                            <i class="fas fa-balance-scale fa-2x mb-3"></i><br>
-                                            Результаты сравнения появятся здесь после обработки файлов
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="card shadow">
+    <div class="card-header bg-primary text-white">
+      <h4 class="mb-0"><i class="fas fa-file-alt me-2"></i>Шаблоны заказов</h4>
     </div>
+    <div class="card-body">
+
+      <div class="vtab-nav">
+        <button class="vtab-btn active" onclick="switchTab('list',this)">
+          <i class="fas fa-table"></i> Шаблоны
+        </button>
+        <button class="vtab-btn" onclick="switchTab('mapping',this)">
+          <i class="fas fa-project-diagram"></i> Номенклатуры по адресам
+        </button>
+      </div>
+
+
+      <!-- ══════════════════════════════════════════
+           ТАБ 1: Список шаблонов
+           ══════════════════════════════════════════ -->
+      <div class="vtab-pane active" id="pane-list">
+
+        <div class="d-flex justify-content-between mb-3">
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="tplTypeFilter" onchange="loadTemplates()" style="width:150px">
+              <option value="">Все типы</option>
+              <option value="КЦ">КЦ</option>
+              <option value="Расходники">Расходники</option>
+            </select>
+            <input class="form-control form-control-sm" id="tplSearch" placeholder="Поиск..."
+                   oninput="filterTplTable()" style="width:200px">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openTplModal()">
+            <i class="fas fa-plus me-1"></i>Новый шаблон
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th width="50">ID</th><th width="110">Тип</th><th>Название</th>
+                <th>Заголовки</th><th width="120">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="tplBody">
+              <tr><td colspan="5" class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm"></div> Загрузка...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-end"><small class="text-muted" id="tplCount"></small></div>
+      </div>
+
+
+      <!-- ══════════════════════════════════════════
+           ТАБ 2: Маппинг адрес → номенклатуры
+           ══════════════════════════════════════════ -->
+      <div class="vtab-pane" id="pane-mapping">
+
+        <!-- Выбор шаблона -->
+        <div class="tpl-select-section">
+          <div class="row align-items-center g-2">
+            <div class="col-auto">
+              <label class="form-label mb-0 fw-semibold">Шаблон:</label>
+            </div>
+            <div class="col-md-4">
+              <select class="form-select" id="mappingTplSelect" onchange="onTplSelect()">
+                <option value="">— выберите шаблон —</option>
+              </select>
+            </div>
+            <div class="col-auto ms-auto">
+              <button class="btn btn-sm btn-outline-secondary" onclick="resetAllMapping()"
+                      title="Сбросить все назначения шаблона">
+                <i class="fas fa-undo me-1"></i>Сбросить всё
+              </button>
+            </div>
+          </div>
+          <div class="mt-2">
+            <small class="text-muted">
+              <i class="fas fa-info-circle me-1"></i>
+              Если адрес не имеет назначений — при создании заказа подтянутся
+              <strong>все</strong> номенклатуры типа шаблона.
+            </small>
+          </div>
+        </div>
+
+        <!-- Двухколоночный редактор -->
+        <div class="mapping-layout" id="mappingLayout">
+
+          <!-- Левая: список адресов -->
+          <div class="mp-left">
+            <div class="mp-left-head">
+              <h6><i class="fas fa-map-marker-alt me-1 text-primary"></i>Адреса</h6>
+              <input class="form-control form-control-sm" id="addrSearchInput"
+                     placeholder="Поиск адреса..." oninput="filterAddrs()">
+            </div>
+            <div class="mp-left-body" id="addrListEl">
+              <div class="text-center py-5 text-muted" style="font-size:13px">
+                Выберите шаблон выше
+              </div>
+            </div>
+          </div>
+
+          <!-- Правая: номенклатуры -->
+          <div class="mp-right">
+            <div class="mp-right-head">
+              <div class="mp-right-title" id="mpRightTitle">← Выберите адрес</div>
+              <div class="mp-right-sub"   id="mpRightSub"></div>
+            </div>
+            <div class="mp-right-toolbar" id="mpToolbar" style="display:none">
+              <input class="form-control form-control-sm" id="nomSearchInput"
+                     placeholder="Поиск..." oninput="filterNoms()" style="max-width:240px">
+              <button class="btn btn-sm btn-outline-success" onclick="checkAllNom()">Все</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="uncheckAllNom()">Снять</button>
+              <span class="mp-count">Выбрано: <strong id="mpCheckedCnt">0</strong></span>
+            </div>
+            <div class="mp-right-body" id="mpNomBody">
+              <div class="mp-placeholder">
+                <i class="fas fa-arrow-left"></i>
+                <p>Выберите адрес для настройки<br>номенклатур</p>
+              </div>
+            </div>
+            <div class="mp-right-footer" id="mpFooter" style="display:none">
+              <span class="mp-hint" id="mpHint"></span>
+              <button class="btn btn-success" onclick="saveAddrMapping()">
+                <i class="fas fa-save me-1"></i>Сохранить
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /mapping-layout -->
+      </div><!-- /pane-mapping -->
+
+    </div>
+  </div>
 </div>
 
-<!-- Модальное окно сравнения -->
-<div class="modal fade" id="comparisonModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Сравнение файлов</h5>
+
+<!-- ══════════════════════════════════════════
+     МОДАЛКА ШАБЛОНА
+     ══════════════════════════════════════════ -->
+<div class="modal fade" id="tplModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tplModalTitle">Новый шаблон</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="tplForm" novalidate>
+          <input type="hidden" id="tplId">
+          <div class="row g-3">
+            <div class="col-md-7">
+              <label class="form-label">Название <span class="text-danger">*</span></label>
+              <input class="form-control" id="tplName" required placeholder="Шаблон КЦ">
+              <div class="invalid-feedback">Введите название</div>
             </div>
-            <div class="modal-body">
-                <div class="text-center">
-                    <div class="spinner-border text-primary mb-3" role="status">
-                        <span class="visually-hidden">Загрузка...</span>
-                    </div>
-                    <p id="comparisonMessage">Начало сравнения...</p>
-                    <div class="progress mb-3">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated"
-                             role="progressbar" style="width: 0%" id="comparisonProgress"></div>
-                    </div>
-                </div>
+            <div class="col-md-5">
+              <label class="form-label">Тип</label>
+              <select class="form-select" id="tplType">
+                <option value="КЦ">КЦ</option>
+                <option value="Расходники">Расходники</option>
+              </select>
             </div>
-        </div>
+            <div class="col-12">
+              <label class="form-label">
+                Заголовки колонок
+                <small class="text-muted">(каждый с новой строки)</small>
+              </label>
+              <textarea class="form-control font-monospace" id="tplHeaders" rows="6"
+                        placeholder="Наименов ТМЦ&#10;Кол-во&#10;Адрес отгрузки&#10;ФИО получателя&#10;Телефон"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button class="btn btn-primary" onclick="saveTpl()">
+          <i class="fas fa-save me-1"></i>Сохранить
+        </button>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Модальное окно деталей -->
-<div class="modal fade" id="detailsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Детали сравнения</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="detailsModalBody">
-                <!-- Детали будут загружены динамически -->
-            </div>
-        </div>
-    </div>
-</div>
+<div id="ntf" style="position:fixed;top:20px;right:20px;z-index:9999;min-width:280px;"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Глобальные переменные для пагинации
-    let currentPage = 1;
-    let totalPages = 1;
-    let perPage = 20;
-    let searchQuery = '';
-    let comparisonFilter = '';
-    let debounceTimer;
-    let comparisonModal = null;
-    let detailsModal = null;
+/* ══════════════════════════════════════════════════
+   ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+   ══════════════════════════════════════════════════ */
+let templates    = [];
+let allAddresses = [];
+let allNom       = [];
 
-    document.addEventListener('DOMContentLoaded', function() {
-        comparisonModal = new bootstrap.Modal(document.getElementById('comparisonModal'));
-        detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+let editTplId    = null;        // текущий редактируемый шаблон (модалка)
+let activeTplId  = null;        // шаблон, открытый в редакторе маппинга
+let activeTplType = null;       // его тип (КЦ / Расходники)
+let currentMapping = {};        // { addr_id(int): [nom_id,...] } — рабочая копия
+let selectedAddrId = null;      // выбранный адрес в левой колонке
+let checkedNomIds  = new Set(); // чекбоксы правой колонки
 
-        // Инициализация
-        perPage = parseInt(document.getElementById('perPageSelect').value);
-        loadHistorySummary();
-        loadHistory();
 
-        // Настройка формы сравнения
-        document.getElementById('compareForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            startComparison();
-        });
+/* ══════════════════════════════════════════════════
+   СТАРТ
+   ══════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+    await Promise.all([loadTemplates(), loadAddresses(), loadNomenclature()]);
+    populateTplSelect();
+});
 
-        // Инициализация фильтров
-        setupFilters();
-    });
 
-    function setupFilters() {
-        // Дебаунс для поиска
-        document.getElementById('searchInput').addEventListener('input', function() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                searchQuery = this.value.trim();
-                currentPage = 1;
-                loadHistory();
-            }, 500);
-        });
+/* ══════════════════════════════════════════════════
+   ВКЛАДКИ
+   ══════════════════════════════════════════════════ */
+function switchTab(id, btn) {
+    document.querySelectorAll('.vtab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.vtab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + id).classList.add('active');
+}
 
-        // Фильтр по результату сравнения
-        document.getElementById('comparisonFilter').addEventListener('change', function() {
-            comparisonFilter = this.value;
-            currentPage = 1;
-            loadHistory();
-        });
 
-        // Количество элементов на странице
-        document.getElementById('perPageSelect').addEventListener('change', function() {
-            perPage = parseInt(this.value);
-            currentPage = 1;
-            loadHistory();
-        });
+/* ══════════════════════════════════════════════════
+   ТАБ 1: ШАБЛОНЫ — загрузка / рендер
+   ══════════════════════════════════════════════════ */
+async function loadTemplates() {
+    try {
+        const r = await fetch('/api/templates?per_page=100');
+        const j = await r.json();
+        templates = j.data || [];
+        renderTplTable(templates);
+        populateTplSelect();
+    } catch(e) { notify('Ошибка загрузки шаблонов', 'error'); }
+}
+
+function renderTplTable(list) {
+    const tb = document.getElementById('tplBody');
+    document.getElementById('tplCount').textContent = `${list.length} шаблонов`;
+    if (!list.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">Шаблонов нет</td></tr>';
+        return;
     }
-
-    function debouncedSearch() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            searchQuery = document.getElementById('searchInput').value.trim();
-            currentPage = 1;
-            loadHistory();
-        }, 500);
-    }
-
-    function loadHistorySummary() {
-        fetch('/api/particle/history/summary')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderHistorySummary(data.data);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading history summary:', error);
-            });
-    }
-
-    function renderHistorySummary(data) {
-        const container = document.getElementById('historySummary');
-        if (!container) return;
-
-        const total = data.summary?.total || 0;
-        const matches = data.summary?.matches || 0;
-        const mismatches = data.summary?.mismatches || 0;
-        const successRate = total > 0 ? Math.round((matches / total) * 100) : 0;
-
-        container.innerHTML = `
-            <div class="row g-2">
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="badge bg-info">Всего: ${total}</span>
-                            <span class="badge bg-success ms-2">Сошлись: ${matches}</span>
-                            <span class="badge bg-danger ms-2">Не сошлись: ${mismatches}</span>
-                            <span class="badge bg-primary ms-2">Успех: ${successRate}%</span>
-                        </div>
-                        <small class="text-muted">${data.recent?.length || 0} новых</small>
-                    </div>
-                </div>
+    tb.innerHTML = list.map(t => {
+        const heads = Array.isArray(t.headers) ? t.headers : [];
+        const pills = heads.map(h => `<span class="badge bg-secondary me-1" style="font-weight:400">${esc(h)}</span>`).join('');
+        const mapped = Object.keys(t.address_mapping || {}).length;
+        return `<tr>
+          <td class="fw-bold text-muted">${t.id}</td>
+          <td><span class="badge ${t.type==='КЦ'?'bg-primary':'bg-warning text-dark'}">${t.type}</span></td>
+          <td>
+            <strong>${esc(t.name)}</strong>
+            ${mapped ? `<small class="text-success ms-2"><i class="fas fa-link"></i> ${mapped} адр.</small>` : ''}
+          </td>
+          <td>${pills||'<span class="text-muted">—</span>'}</td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-primary"  onclick="openTplModal(${t.id})" title="Редактировать"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-outline-danger"   onclick="deleteTpl(${t.id})"    title="Удалить"><i class="fas fa-trash"></i></button>
             </div>
-        `;
+          </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterTplTable() {
+    const q = document.getElementById('tplSearch').value.toLowerCase();
+    renderTplTable(q ? templates.filter(t => t.name.toLowerCase().includes(q)) : templates);
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 1: CRUD
+   ══════════════════════════════════════════════════ */
+function openTplModal(id = null) {
+    editTplId = id;
+    const t = id ? templates.find(x => x.id === id) : null;
+    document.getElementById('tplModalTitle').textContent = id ? 'Редактировать шаблон' : 'Новый шаблон';
+    document.getElementById('tplId').value      = id || '';
+    document.getElementById('tplName').value    = t?.name || '';
+    document.getElementById('tplType').value    = t?.type || 'КЦ';
+    document.getElementById('tplHeaders').value = t ? (Array.isArray(t.headers) ? t.headers : []).join('\n') : '';
+    document.getElementById('tplForm').classList.remove('was-validated');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('tplModal')).show();
+}
+
+async function saveTpl() {
+    const form = document.getElementById('tplForm');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+    const headers = document.getElementById('tplHeaders').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const body = { name: document.getElementById('tplName').value.trim(),
+                   type: document.getElementById('tplType').value, headers };
+    const url = editTplId ? `/api/templates/${editTplId}` : '/api/templates';
+    try {
+        const r = await fetch(url, { method: editTplId?'PUT':'POST',
+                                     headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || 'Ошибка');
+        bootstrap.Modal.getInstance(document.getElementById('tplModal')).hide();
+        await loadTemplates();
+        notify(editTplId ? 'Шаблон обновлён' : 'Шаблон создан', 'success');
+    } catch(e) { notify(e.message, 'error'); }
+}
+
+async function deleteTpl(id) {
+    const t = templates.find(x => x.id === id);
+    if (!confirm(`Удалить шаблон «${t?.name}»?`)) return;
+    try {
+        const r = await fetch(`/api/templates/${id}`, {method:'DELETE'});
+        if (!r.ok) throw new Error('Ошибка');
+        await loadTemplates();
+        notify('Шаблон удалён', 'success');
+    } catch(e) { notify(e.message, 'error'); }
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: ДАННЫЕ
+   ══════════════════════════════════════════════════ */
+async function loadAddresses() {
+    const r = await fetch('/api/addresses?per_page=100');
+    const j = await r.json();
+    allAddresses = j.data || [];
+}
+
+async function loadNomenclature() {
+    const r = await fetch('/api/nomenclature?per_page=100');
+    const j = await r.json();
+    allNom = j.data || [];
+}
+
+function populateTplSelect() {
+    const sel = document.getElementById('mappingTplSelect');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— выберите шаблон —</option>' +
+        templates.map(t => `<option value="${t.id}">${esc(t.name)} (${t.type})</option>`).join('');
+    if (cur) sel.value = cur;
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: ВЫБОР ШАБЛОНА
+   ══════════════════════════════════════════════════ */
+async function onTplSelect() {
+    const id = parseInt(document.getElementById('mappingTplSelect').value);
+    if (!id) {
+        activeTplId = null; activeTplType = null; currentMapping = {};
+        selectedAddrId = null; checkedNomIds = new Set();
+        document.getElementById('addrListEl').innerHTML =
+            '<div class="text-center py-5 text-muted" style="font-size:13px">Выберите шаблон выше</div>';
+        resetRightPane();
+        return;
     }
 
-    function loadHistory() {
-        const historyDiv = document.getElementById('comparisonHistory');
-        const paginationContainer = document.getElementById('paginationContainer');
+    activeTplId = id;
+    const tpl = templates.find(t => t.id === id);
+    activeTplType = tpl?.type || 'КЦ';
 
-        // Показываем индикатор загрузки
-        historyDiv.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Загрузка...</span>
-                </div>
-                <p class="text-muted mt-2">Загрузка истории...</p>
-            </div>
-        `;
+    // Загружаем маппинг шаблона
+    try {
+        const r = await fetch(`/api/templates/${id}/mapping`);
+        const j = await r.json();
+        currentMapping = j.data?.mapping || {};
+        // Ключи приходят как числа из API (_parse), но на всякий случай нормализуем
+        const norm = {};
+        Object.entries(currentMapping).forEach(([k,v]) => { norm[parseInt(k)] = v; });
+        currentMapping = norm;
+    } catch(e) { currentMapping = {}; }
 
-        // Скрываем пагинацию
-        paginationContainer.classList.add('d-none');
+    selectedAddrId = null; checkedNomIds = new Set();
+    resetRightPane();
+    renderAddrList(allAddresses);
+}
 
-        // Формируем URL с параметрами
-        let url = `/api/particle/history?page=${currentPage}&per_page=${perPage}`;
-        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
-        if (comparisonFilter) url += `&comparison=${comparisonFilter}`;
 
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderHistory(data);
-                    renderPagination(data);
-                } else {
-                    throw new Error(data.message || 'Ошибка загрузки');
-                }
-            })
-            .catch(error => {
-                console.error('Error loading history:', error);
-                historyDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Ошибка загрузки истории: ${error.message}
-                    </div>
-                `;
-            });
+/* ══════════════════════════════════════════════════
+   ТАБ 2: ЛЕВАЯ КОЛОНКА — АДРЕСА
+   ══════════════════════════════════════════════════ */
+function renderAddrList(list) {
+    const el = document.getElementById('addrListEl');
+    if (!list.length) {
+        el.innerHTML = '<div class="text-center py-5 text-muted" style="font-size:13px">Нет адресов</div>';
+        return;
+    }
+    el.innerHTML = list.map(a => {
+        const cnt = (currentMapping[a.id] || []).length;
+        const pill = cnt > 0
+            ? `<span class="addr-count-pill acp-set">${cnt} поз.</span>`
+            : `<span class="addr-count-pill acp-all">Все</span>`;
+        const np = a.np_number ? `<span class="badge bg-info text-dark me-1" style="font-size:10px">${a.np_number}</span>` : '';
+        return `<div class="addr-item ${a.id===selectedAddrId?'active':''}" id="ai_${a.id}" onclick="selectAddr(${a.id})">
+          <div class="addr-item-text">
+            <div class="addr-item-name">${np}${esc(a.address)}</div>
+            <div class="addr-item-sub">${esc(a.contact_person)}</div>
+          </div>
+          ${pill}
+        </div>`;
+    }).join('');
+}
+
+function filterAddrs() {
+    if (!activeTplId) return;
+    const q = document.getElementById('addrSearchInput').value.toLowerCase();
+    renderAddrList(q ? allAddresses.filter(a =>
+        a.address.toLowerCase().includes(q) ||
+        a.contact_person.toLowerCase().includes(q) ||
+        (a.np_number && String(a.np_number).includes(q))
+    ) : allAddresses);
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: ВЫБОР АДРЕСА → ПРАВАЯ КОЛОНКА
+   ══════════════════════════════════════════════════ */
+function selectAddr(addrId) {
+    // Подсветка
+    document.querySelectorAll('.addr-item').forEach(e => e.classList.remove('active'));
+    const el = document.getElementById(`ai_${addrId}`);
+    if (el) el.classList.add('active');
+
+    selectedAddrId = addrId;
+    const addr = allAddresses.find(a => a.id === addrId);
+
+    document.getElementById('mpRightTitle').textContent = addr ? addr.address : `#${addrId}`;
+    document.getElementById('mpRightSub').textContent   =
+        addr ? `${addr.contact_person}${addr.phone?' · '+addr.phone:''}` : '';
+
+    // Заполняем Set из маппинга (только позиции текущего типа)
+    const saved = (currentMapping[addrId] || []);
+    checkedNomIds = new Set(saved.filter(id => {
+        const n = allNom.find(x => x.id === id);
+        return n && n.type === activeTplType;
+    }));
+
+    document.getElementById('mpToolbar').style.display = '';
+    document.getElementById('mpFooter').style.display  = '';
+    document.getElementById('nomSearchInput').value = '';
+    renderNomList('');
+    updateCheckedCnt();
+    updateFooterHint();
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: ПРАВАЯ КОЛОНКА — НОМЕНКЛАТУРЫ
+   ══════════════════════════════════════════════════ */
+function renderNomList(query) {
+    const q = query.toLowerCase();
+    const filtered = allNom.filter(n =>
+        n.type === activeTplType &&
+        (!q || n.name.toLowerCase().includes(q) || (n.comment && n.comment.toLowerCase().includes(q)))
+    );
+    const body = document.getElementById('mpNomBody');
+
+    if (!filtered.length) {
+        body.innerHTML = `<div class="mp-placeholder" style="height:auto;padding:40px 0">
+          <i class="fas fa-box-open" style="font-size:28px"></i>
+          <p>Нет номенклатур типа «${activeTplType}»</p></div>`;
+        return;
     }
 
-    function renderHistory(data) {
-        const historyDiv = document.getElementById('comparisonHistory');
-        const items = data.data || [];
+    body.innerHTML = `<div class="nom-sep">${activeTplType}</div>` +
+        filtered.map(n => {
+            const on = checkedNomIds.has(n.id);
+            return `<div class="ncheck-item ${on?'on':''}" id="ni_${n.id}" onclick="toggleNom(${n.id})">
+              <input type="checkbox" id="ncb_${n.id}" ${on?'checked':''} onclick="event.stopPropagation();toggleNom(${n.id})">
+              <div class="ncheck-name">
+                ${esc(n.name)}
+                ${n.comment?`<span class="ncheck-comment">${esc(n.comment)}</span>`:''}
+              </div>
+            </div>`;
+        }).join('');
+}
 
-        if (items.length === 0) {
-            let message = 'История сравнений пуста';
-            if (searchQuery) message = 'По вашему запросу ничего не найдено';
-            if (comparisonFilter) message = 'Нет записей с выбранным фильтром';
+function toggleNom(id) {
+    if (checkedNomIds.has(id)) checkedNomIds.delete(id);
+    else                        checkedNomIds.add(id);
+    const item = document.getElementById(`ni_${id}`);
+    const cb   = document.getElementById(`ncb_${id}`);
+    if (item) item.classList.toggle('on', checkedNomIds.has(id));
+    if (cb)   cb.checked = checkedNomIds.has(id);
+    updateCheckedCnt();
+    updateFooterHint();
+}
 
-            historyDiv.innerHTML = `
-                <div class="text-center text-muted py-4">
-                    <i class="fas fa-history fa-2x mb-3"></i>
-                    <p>${message}</p>
-                    ${searchQuery || comparisonFilter ?
-                        '<button class="btn btn-sm btn-outline-secondary mt-2" onclick="resetFilters()">Сбросить фильтры</button>' : ''}
-                </div>
-            `;
-            return;
+function filterNoms() {
+    renderNomList(document.getElementById('nomSearchInput').value);
+}
+function checkAllNom() {
+    allNom.filter(n => n.type === activeTplType).forEach(n => checkedNomIds.add(n.id));
+    renderNomList(document.getElementById('nomSearchInput').value);
+    updateCheckedCnt(); updateFooterHint();
+}
+function uncheckAllNom() {
+    allNom.filter(n => n.type === activeTplType).forEach(n => checkedNomIds.delete(n.id));
+    renderNomList(document.getElementById('nomSearchInput').value);
+    updateCheckedCnt(); updateFooterHint();
+}
+function updateCheckedCnt() {
+    document.getElementById('mpCheckedCnt').textContent = checkedNomIds.size;
+}
+function updateFooterHint() {
+    document.getElementById('mpHint').textContent = checkedNomIds.size > 0
+        ? `Выбрано ${checkedNomIds.size} позиций`
+        : '💡 Ничего не выбрано — при создании заказа подтянутся все номенклатуры';
+}
+function resetRightPane() {
+    document.getElementById('mpRightTitle').textContent = '← Выберите адрес';
+    document.getElementById('mpRightSub').textContent   = '';
+    document.getElementById('mpToolbar').style.display  = 'none';
+    document.getElementById('mpFooter').style.display   = 'none';
+    document.getElementById('mpNomBody').innerHTML = `
+        <div class="mp-placeholder">
+          <i class="fas fa-arrow-left"></i>
+          <p>Выберите адрес для настройки<br>номенклатур</p>
+        </div>`;
+}
+
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: СОХРАНЕНИЕ ОДНОГО АДРЕСА
+   ══════════════════════════════════════════════════ */
+async function saveAddrMapping() {
+    if (!activeTplId || !selectedAddrId) return;
+
+    // Обновляем локальную копию маппинга
+    if (checkedNomIds.size > 0) {
+        currentMapping[selectedAddrId] = [...checkedNomIds];
+    } else {
+        delete currentMapping[selectedAddrId];
+    }
+
+    // Сохраняем весь маппинг шаблона одним запросом
+    try {
+        const r = await fetch(`/api/templates/${activeTplId}/mapping`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ address_mapping: currentMapping })
+        });
+        if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || 'Ошибка');
+
+        // Обновляем пилюлю в списке адресов
+        const cnt  = checkedNomIds.size;
+        const pill = document.querySelector(`#ai_${selectedAddrId} .addr-count-pill`);
+        if (pill) {
+            pill.className = 'addr-count-pill ' + (cnt > 0 ? 'acp-set' : 'acp-all');
+            pill.textContent = cnt > 0 ? `${cnt} поз.` : 'Все';
         }
 
-        let html = '<div class="list-group list-group-flush">';
+        // Обновляем счётчик в таблице шаблонов (для отображения)
+        const tpl = templates.find(t => t.id === activeTplId);
+        if (tpl) tpl.address_mapping = {...currentMapping};
 
-        items.forEach(item => {
-            const date = item.created_at_formatted || item.created_at;
-            const resultClass = item.comparison_class || (item.comparison === 'match' ? 'success' : 'danger');
-            const resultText = item.comparison_ru || (item.comparison === 'match' ? 'Сошлись' : 'Не сошлись');
+        notify(cnt > 0 ? `✓ Сохранено: ${cnt} позиций` : '✓ Сброшено — будут все', 'success');
+    } catch(e) {
+        notify('Ошибка: ' + e.message, 'error');
+    }
+}
 
-            html += `
-                <div class="list-group-item">
-                    <div class="d-flex w-100 justify-content-between align-items-start">
-                        <div class="flex-grow-1 me-3">
-                            <div class="d-flex align-items-center mb-1">
-                                <span class="badge bg-secondary me-2">#${item.id}</span>
-                                <h6 class="mb-0 text-truncate" style="max-width: 300px;" title="${item.file1_name}">
-                                    <i class="fas fa-file-excel text-primary me-1"></i>${item.file1_name}
-                                </h6>
-                                <i class="fas fa-exchange-alt text-muted mx-2"></i>
-                                <h6 class="mb-0 text-truncate" style="max-width: 300px;" title="${item.file2_name}">
-                                    <i class="fas fa-file-excel text-success me-1"></i>${item.file2_name}
-                                </h6>
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-                                <span class="badge bg-${resultClass}">
-                                    <i class="fas ${item.comparison === 'match' ? 'fa-check' : 'fa-times'} me-1"></i>${resultText}
-                                </span>
-                                <small class="text-muted">
-                                    <i class="fas fa-calendar me-1"></i>${item.date_only || date}
-                                </small>
-                                <small class="text-muted">
-                                    <i class="fas fa-clock ms-2 me-1"></i>${item.time_only || ''}
-                                </small>
-                                <small class="text-muted">
-                                    <i class="fas fa-minus-circle ms-2 me-1"></i>${item.minus_count1 || 0}/${item.minus_count2 || 0}
-                                </small>
-                            </div>
-                            ${item.total1 !== null && item.total2 !== null ? `
-                                <div class="small">
-                                    <span class="text-muted">Итоги:</span>
-                                    <span class="ms-1">${item.total1 || 0}</span>
-                                    <i class="fas fa-equals mx-1 text-muted"></i>
-                                    <span>${item.total2 || 0}</span>
-                                </div>
-                            ` : ''}
-                        </div>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-info" onclick="viewComparisonDetails(${item.id})" title="Просмотреть">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="deleteComparison(${item.id})" title="Удалить">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+
+/* ══════════════════════════════════════════════════
+   ТАБ 2: СБРОС ВСЕГО МАППИНГА ШАБЛОНА
+   ══════════════════════════════════════════════════ */
+async function resetAllMapping() {
+    if (!activeTplId) { notify('Сначала выберите шаблон', 'warning'); return; }
+    const tpl = templates.find(t => t.id === activeTplId);
+    if (!confirm(`Сбросить все назначения шаблона «${tpl?.name}»?\nВсем адресам будут подтягиваться все номенклатуры.`)) return;
+
+    currentMapping = {};
+    selectedAddrId = null;
+    checkedNomIds  = new Set();
+
+    try {
+        const r = await fetch(`/api/templates/${activeTplId}/mapping`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ address_mapping: {} })
         });
-
-        html += '</div>';
-        historyDiv.innerHTML = html;
+        if (!r.ok) throw new Error('Ошибка');
+        if (tpl) tpl.address_mapping = {};
+        renderAddrList(allAddresses);
+        resetRightPane();
+        notify('Все назначения сброшены', 'success');
+    } catch(e) {
+        notify('Ошибка: ' + e.message, 'error');
     }
+}
 
-    function renderPagination(data) {
-        const paginationContainer = document.getElementById('paginationContainer');
-        const pagination = document.getElementById('pagination');
 
-        if (!data.pages || data.pages <= 1) {
-            paginationContainer.classList.add('d-none');
-            return;
-        }
-
-        totalPages = data.pages;
-        currentPage = data.page;
-
-        pagination.innerHTML = '';
-
-        // Кнопка "Назад"
-        const prevLi = document.createElement('li');
-        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-        prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">&laquo;</a>`;
-        pagination.appendChild(prevLi);
-
-        // Номера страниц
-        const startPage = Math.max(1, currentPage - 2);
-        const endPage = Math.min(totalPages, startPage + 4);
-
-        for (let i = startPage; i <= endPage; i++) {
-            const pageLi = document.createElement('li');
-            pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
-            pageLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
-            pagination.appendChild(pageLi);
-        }
-
-        // Кнопка "Вперед"
-        const nextLi = document.createElement('li');
-        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-        nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">&raquo;</a>`;
-        pagination.appendChild(nextLi);
-
-        // Информация о странице
-        const infoLi = document.createElement('li');
-        infoLi.className = 'page-item disabled';
-        const startItem = (currentPage - 1) * perPage + 1;
-        const endItem = Math.min(currentPage * perPage, data.total);
-        infoLi.innerHTML = `<span class="page-link text-muted">${startItem}-${endItem} из ${data.total}</span>`;
-        pagination.appendChild(infoLi);
-
-        paginationContainer.classList.remove('d-none');
-    }
-
-    function changePage(page) {
-        if (page < 1 || page > totalPages || page === currentPage) return;
-        currentPage = page;
-        loadHistory();
-        window.scrollTo({ top: document.getElementById('comparisonHistory').offsetTop - 100, behavior: 'smooth' });
-    }
-
-    function resetFilters() {
-        searchQuery = '';
-        comparisonFilter = '';
-        currentPage = 1;
-
-        document.getElementById('searchInput').value = '';
-        document.getElementById('comparisonFilter').value = '';
-
-        loadHistory();
-        loadHistorySummary();
-    }
-
-    function viewComparisonDetails(id) {
-        fetch(`/api/particle/history/${id}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showDetailsModal(data.data);
-                } else {
-                    throw new Error(data.message || 'Ошибка загрузки деталей');
-                }
-            })
-            .catch(error => {
-                showNotification(`Ошибка загрузки деталей: ${error.message}`, 'error');
-            });
-    }
-
-    function showDetailsModal(item) {
-        const modalBody = document.getElementById('detailsModalBody');
-
-        const resultClass = item.comparison_class || (item.comparison === 'match' ? 'success' : 'danger');
-        const resultText = item.comparison_ru || (item.comparison === 'match' ? 'Сошлись' : 'Не сошлись');
-        const resultIcon = item.comparison === 'match' ? 'fa-check-circle' : 'fa-times-circle';
-
-        modalBody.innerHTML = `
-            <div class="row">
-                <div class="col-12">
-                    <div class="alert alert-${resultClass}">
-                        <h5><i class="fas ${resultIcon} me-2"></i>${resultText}</h5>
-                        <p class="mb-0">Сравнение выполнено: ${item.created_at_formatted || item.created_at}</p>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header bg-primary text-white">
-                            <h6 class="mb-0"><i class="fas fa-file-excel me-2"></i>${item.file1_name}</h6>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-sm">
-                                <tr>
-                                    <th>Минусовые ячейки:</th>
-                                    <td>${item.minus_count1 || 0}</td>
-                                </tr>
-                                <tr>
-                                    <th>Итоговое значение:</th>
-                                    <td>${item.total1 !== null ? item.total1 : 'Не найдено'}</td>
-                                </tr>
-                                <tr>
-                                    <th>Статус файла:</th>
-                                    <td>
-                                        <span class="badge ${item.minus_count1 > 0 ? 'bg-warning' : 'bg-success'}">
-                                            ${item.minus_count1 > 0 ? 'Есть минусы' : 'Без минусов'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header bg-success text-white">
-                            <h6 class="mb-0"><i class="fas fa-file-excel me-2"></i>${item.file2_name}</h6>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-sm">
-                                <tr>
-                                    <th>Минусовые ячейки:</th>
-                                    <td>${item.minus_count2 || 0}</td>
-                                </tr>
-                                <tr>
-                                    <th>Итоговое значение:</th>
-                                    <td>${item.total2 !== null ? item.total2 : 'Не найдено'}</td>
-                                </tr>
-                                <tr>
-                                    <th>Статус файла:</th>
-                                    <td>
-                                        <span class="badge ${item.minus_count2 > 0 ? 'bg-warning' : 'bg-success'}">
-                                            ${item.minus_count2 > 0 ? 'Есть минусы' : 'Без минусов'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Результат сравнения</h6>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr class="table-${resultClass}">
-                                        <th>${item.file1_name}</th>
-                                        <th>${item.file2_name}</th>
-                                        <th>Результат</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>${item.total1 !== null ? item.total1 : 'Не найдено'}</td>
-                                        <td>${item.total2 !== null ? item.total2 : 'Не найдено'}</td>
-                                        <td class="fw-bold text-${resultClass}">
-                                            ${item.comparison === 'match' ? '✅ Значения совпадают' : '❌ Значения не совпадают'}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-3 text-center">
-                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Закрыть</button>
-                ${item.comparison === 'mismatch' ? `
-                    <button class="btn btn-warning" onclick="reanalyzeComparison(${item.id})">
-                        <i class="fas fa-redo me-2"></i>Перепроверить
-                    </button>
-                ` : ''}
-            </div>
-        `;
-
-        detailsModal.show();
-    }
-
-    function reanalyzeComparison(id) {
-        showNotification('Функция перепроверки находится в разработке', 'info');
-    }
-
-    // Остальные функции (startComparison, showComparisonResults, deleteComparison и т.д.) остаются без изменений
-    // ... [остальной JavaScript код из предыдущего ответа]
-
+/* ══════════════════════════════════════════════════
+   УТИЛИТЫ
+   ══════════════════════════════════════════════════ */
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function notify(msg, type='info') {
+    const map={success:'alert-success',error:'alert-danger',warning:'alert-warning',info:'alert-info'};
+    const d=document.createElement('div');
+    d.className=`alert ${map[type]||'alert-info'} alert-dismissible fade show shadow-sm`;
+    d.style.marginBottom='8px';
+    d.innerHTML=`${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.getElementById('ntf').appendChild(d);
+    setTimeout(()=>{d.classList.remove('show');setTimeout(()=>d.remove(),200);},4000);
+}
 </script>
 {% endblock %}

@@ -22,4 +22,5 @@ __all__ = [
     'stats_router',
     'particle_router',
     'work_orders_router'  # Добавлен новый роутер
+
 ]

@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from app.config import settings
-
+from app.routers import excel_text
 # Импорт маршрутов
 from app.routers import (
     auth,
@@ -80,6 +80,7 @@ app.include_router(pandas_analysis.router, prefix="/api/pandas", tags=["Pandas �
 app.include_router(stats.router, prefix="/api/stats", tags=["Статистика"])
 app.include_router(particle.router, prefix="/api/particle", tags=["Сравнение файлов"])
 app.include_router(work_orders.router, prefix="/api/work_orders", tags=["Обработка заявок"])
+app.include_router(excel_text.router, prefix="/api/excel-text", tags=["excel-text"])
 
 # HTML страницы
 @app.get("/", include_in_schema=False)
@@ -136,6 +137,10 @@ async def work_types_list(request: Request):
 @app.exception_handler(404)
 async def not_found_exception_handler(request: Request, exc):
     return jinja_templates.TemplateResponse("404.html", {"request": request}, status_code=404)
+
+@app.get("/page/excel-text")
+async def excel_text_page(request: Request):
+    return jinja_templates.TemplateResponse("excel_text.html", {"request": request})
 
 # Health check endpoint
 @app.get("/health")

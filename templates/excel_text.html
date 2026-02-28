@@ -1,0 +1,925 @@
+{% extends "base.html" %}
+{% block title %}Excel → Текст{% endblock %}
+{% block page_title %}Генератор текста из Excel{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ══ Общий layout ══════════════════════════════════════════ */
+.et-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .et-grid { grid-template-columns: 1fr; } }
+
+.et-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  color: black;
+}
+.et-card-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fafafa;
+  color: black;
+}
+.et-card-head .icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+}
+.et-card-head h6 { margin: 0; font-size: 13px; font-weight: 700; color: black; }
+.et-card-head small { font-size: 11px; color: #9ca3af; display: block; }
+.et-card-body { padding: 16px 18px; }
+
+/* ══ Загрузка файла ════════════════════════════════════════ */
+.drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: #fafafa;
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.drop-zone.has-file {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+.drop-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+}
+.drop-icon { font-size: 28px; margin-bottom: 8px; }
+.drop-text { font-size: 13px; color: #6b7280; }
+.drop-file-name { font-size: 13px; font-weight: 600; color: #166534; margin-top: 6px; }
+
+/* ══ Настройки файла ═══════════════════════════════════════ */
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.setting-row .full { grid-column: 1 / -1; }
+
+/* ══ Столбцы (плашки) ══════════════════════════════════════ */
+.col-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.col-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+  transition: all .12s;
+  max-width: 200px;
+}
+.col-chip .idx { color: #9ca3af; font-weight: 400; font-size: 10px; }
+.col-chip:hover { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+.col-chip:active { transform: scale(.95); }
+.col-chip.inserted { animation: chipPop .25s ease; background: #dcfce7; border-color: #86efac; color: #166534; }
+@keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
+
+/* ══ Паттерн ═══════════════════════════════════════════════ */
+.pattern-wrap { position: relative; }
+#patternInput {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 80px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border-color: #313244;
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.6;
+}
+#patternInput:focus { border-color: #89b4fa; box-shadow: 0 0 0 3px rgba(137,180,250,.15); }
+.pattern-preview-line {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+  font-style: italic;
+  min-height: 18px;
+}
+.pattern-preview-line .filled { color: #059669; font-weight: 500; font-style: normal; }
+
+/* ══ Плейсхолдер-подсказки ═════════════════════════════════ */
+.ph-hint {
+  font-size: 11px; color: #9ca3af; margin-top: 4px;
+  display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+}
+.ph-tag {
+  background: #1e1e2e; color: #89b4fa;
+  font-family: monospace; font-size: 11px;
+  padding: 1px 6px; border-radius: 4px; cursor: pointer;
+}
+.ph-tag:hover { background: #313244; }
+
+/* ══ Фильтры ═══════════════════════════════════════════════ */
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 130px 1fr 28px;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+.filter-row select, .filter-row input { font-size: 12px; }
+.btn-rm-filter {
+  width: 28px; height: 28px;
+  border: 1px solid #fee2e2; background: #fef2f2; color: #dc2626;
+  border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.btn-rm-filter:hover { background: #fee2e2; }
+
+/* ══ Правая колонка: превью ════════════════════════════════ */
+.preview-table-wrap {
+  overflow-x: auto;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.preview-table {
+  font-size: 11px;
+  margin: 0;
+  white-space: nowrap;
+}
+.preview-table thead { position: sticky; top: 0; background: #1e293b; color: black; z-index: 1; }
+.preview-table th, .preview-table td { padding: 5px 10px; border: none; border-right: 1px solid #e5e7eb; color: black }
+.preview-table tr:nth-child(even) td { background: #f9fafb; }
+
+/* ══ Результат ══════════════════════════════════════════════ */
+.result-area {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  min-height: 200px;
+  max-height: 420px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid #1e293b;
+}
+.result-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 200px; color: #475569; gap: 8px;
+}
+
+/* ══ Статистика ════════════════════════════════════════════ */
+.stat-row {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.stat-item {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 8px 14px; text-align: center; flex: 1; min-width: 80px;
+}
+.stat-val { font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1; }
+.stat-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+
+/* ══ Прочее ════════════════════════════════════════════════ */
+.sep-select { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.sep-opt {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e7eb;
+  font-size: 11px; cursor: pointer; transition: all .12s; background: #f9fafb; color: #374151;
+}
+.sep-opt:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.sep-opt.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+.step-badge {
+  width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; color: #fff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+  <!-- Заголовок -->
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="mb-1 fw-bold">
+        <i class="fas fa-file-excel text-success me-2"></i>Ручные паттерны
+      </h4>
+      <p class="text-muted mb-0" style="font-size:13px">
+       Загружаем файл - делаем полностью свою настройку.
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="saveConfig()">
+        <i class="fas fa-save me-1"></i>Сохранить конфиг
+      </button>
+      <button class="btn btn-sm btn-outline-primary" onclick="loadConfigDialog()">
+        <i class="fas fa-folder-open me-1"></i>Загрузить конфиг
+      </button>
+    </div>
+  </div>
+
+  <div class="et-grid">
+
+    <!-- ══════════════════════════════════════════
+         ЛЕВАЯ КОЛОНКА: НАСТРОЙКИ
+         ══════════════════════════════════════════ -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Шаг 1: Файл -->
+      <div class="et-card">
+        <div class="et-card-head">
+          <span class="step-badge">1</span>
+          <div class="icon" style="background:#dcfce7"><i class="fas fa-file-excel text-success"></i></div>
+          <div>
+            <h6>Файл Excel</h6>
+            <small>xlsx, xls, xlsm</small>
+          </div>
+        </div>
+        <div class="et-card-body">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.ods"
+                   onchange="onFileSelected(this)">
+            <div id="dropContent">
+              <div class="drop-icon">📂</div>
+              <div class="drop-text">Кликните или перетащите файл</div>
+              <div style="font-size:11px;color:#9ca3af;margin-top:4px">.xlsx .xls .xlsm</div>
+            </div>
+          </div>
+
+          <div class="setting-row mt-3">
+            <div>
+              <label class="form-label" style="font-size:11px">Лист</label>
+              <select class="form-select form-select-sm" id="sheetSelect" onchange="reloadPreview()">
+                <option value="0">Лист 1</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">Строка с заголовками</label>
+              <input type="number" class="form-control form-control-sm" id="headerRow"
+                     value="1" min="1" max="20" onchange="reloadPreview()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">Пропустить строк после шапки</label>
+              <input type="number" class="form-control form-control-sm" id="skipRows"
+                     value="0" min="0" max="100">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">Макс. строк (0 = все)</label>
+              <input type="number" class="form-control form-control-sm" id="maxRows"
+                     value="0" min="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Шаг 2: Паттерн -->
+      <div class="et-card">
+        <div class="et-card-head">
+          <span class="step-badge">2</span>
+          <div class="icon" style="background:#dbeafe"><i class="fas fa-code text-primary"></i></div>
+          <div>
+            <h6>Паттерн текста</h6>
+            <small>Кликните на столбец чтобы вставить</small>
+          </div>
+        </div>
+        <div class="et-card-body">
+
+          <!-- Плашки столбцов -->
+          <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">
+            Доступные столбцы
+          </div>
+          <div class="col-chips-wrap" id="colChips">
+            <span class="text-muted" style="font-size:12px">Загрузите файл для отображения столбцов</span>
+          </div>
+
+          <!-- Поле паттерна -->
+          <div class="pattern-wrap mt-3">
+            <label class="form-label" style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">
+              Шаблон строки
+            </label>
+            <textarea id="patternInput" class="form-control"
+                      placeholder="Например: {Адрес} | {ФИО получателя} | тел: {Телефон}"
+                      oninput="updatePatternPreview()" rows="3"></textarea>
+            <div class="ph-hint mt-1">
+              <span>Используй</span>
+              <span class="ph-tag">{Имя столбца}</span>
+              <span>или</span>
+              <span class="ph-tag">{0}</span>
+              <span class="ph-tag">{1}</span>
+              <span>(по номеру)</span>
+            </div>
+          </div>
+
+          <!-- Живой превью паттерна -->
+          <div class="pattern-preview-line" id="patternPreviewLine">
+            <i class="fas fa-eye text-muted me-1"></i>
+            <span class="text-muted">Предпросмотр появится после загрузки файла</span>
+          </div>
+
+          <!-- Разделитель -->
+          <div class="mt-3">
+            <label class="form-label" style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">
+              Разделитель между строками
+            </label>
+            <input type="text" class="form-control form-control-sm" id="separatorInput"
+                   value="\n" placeholder="\n">
+            <div class="sep-select" id="sepPresets">
+              <span class="sep-opt active" data-val="\n" onclick="setSep(this)">Новая строка ↵</span>
+              <span class="sep-opt" data-val="\n\n" onclick="setSep(this)">Двойной отступ</span>
+              <span class="sep-opt" data-val="; " onclick="setSep(this)">; точка с зап.</span>
+              <span class="sep-opt" data-val=", " onclick="setSep(this)">, запятая</span>
+              <span class="sep-opt" data-val=" | " onclick="setSep(this)">| пайп</span>
+            </div>
+          </div>
+
+          <!-- Опции -->
+          <div class="mt-3 d-flex gap-3 flex-wrap">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="skipEmpty" checked>
+              <label class="form-check-label" style="font-size:12px" for="skipEmpty">
+                Пропускать пустые строки
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Шаг 3: Фильтры -->
+      <div class="et-card">
+        <div class="et-card-head">
+          <span class="step-badge">3</span>
+          <div class="icon" style="background:#fef3c7"><i class="fas fa-filter text-warning"></i></div>
+          <div>
+            <h6>Фильтры строк <small class="text-muted fw-normal">(необязательно)</small></h6>
+            <small>Обрабатывать только строки, соответствующие условиям</small>
+          </div>
+          <button class="btn btn-sm btn-outline-primary ms-auto" onclick="addFilter()" style="font-size:11px">
+            <i class="fas fa-plus me-1"></i>Добавить
+          </button>
+        </div>
+        <div class="et-card-body" id="filtersWrap">
+          <div class="text-muted text-center py-3" style="font-size:12px" id="filtersEmpty">
+            <i class="fas fa-check-circle text-success me-1"></i>Все строки обрабатываются
+          </div>
+        </div>
+      </div>
+
+      <!-- Кнопка генерации -->
+      <button class="btn btn-success btn-lg w-100 fw-bold" onclick="generate()" id="generateBtn" disabled>
+        <i class="fas fa-magic me-2"></i>Сгенерировать текст
+      </button>
+
+    </div><!-- /левая колонка -->
+
+
+    <!-- ══════════════════════════════════════════
+         ПРАВАЯ КОЛОНКА: ПРЕВЬЮ + РЕЗУЛЬТАТ
+         ══════════════════════════════════════════ -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Превью файла -->
+      <div class="et-card" id="previewCard" style="display:none">
+        <div class="et-card-head">
+          <div class="icon" style="background:#f0fdf4"><i class="fas fa-table text-success"></i></div>
+          <div>
+            <h6>Превью данных</h6>
+            <small id="previewMeta">—</small>
+          </div>
+        </div>
+        <div class="et-card-body p-0">
+          <div class="preview-table-wrap">
+            <table class="table preview-table" id="previewTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Результат -->
+      <div class="et-card">
+        <div class="et-card-head">
+          <div class="icon" style="background:#ede9fe"><i class="fas fa-align-left text-purple" style="color:#7c3aed"></i></div>
+          <div>
+            <h6>Результат</h6>
+            <small id="resultMeta">Нажмите «Сгенерировать»</small>
+          </div>
+          <div class="ms-auto d-flex gap-2" id="resultActions" style="display:none!important">
+            <button class="btn btn-sm btn-outline-secondary" onclick="copyResult()" title="Копировать">
+              <i class="fas fa-copy"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-primary" onclick="downloadResult()" title="Скачать .txt">
+              <i class="fas fa-download"></i>
+            </button>
+          </div>
+        </div>
+        <div class="et-card-body pt-0" id="resultWrap">
+
+          <!-- Статистика (скрыта до генерации) -->
+          <div id="statRow" style="display:none" class="pt-3 pb-2">
+            <div class="stat-row">
+              <div class="stat-item">
+                <div class="stat-val text-success" id="statGenerated">0</div>
+                <div class="stat-lbl">Создано</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val text-warning" id="statSkipped">0</div>
+                <div class="stat-lbl">Пропущено</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val text-primary" id="statTotal">0</div>
+                <div class="stat-lbl">Всего строк</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-area" id="resultArea">
+            <div class="result-empty">
+              <i class="fas fa-magic fa-2x"></i>
+              <span style="font-size:13px">Здесь появится результат</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /правая колонка -->
+  </div><!-- /et-grid -->
+</div>
+
+<!-- Модалка: сохранённые конфиги -->
+<div class="modal fade" id="configModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Сохранённые конфиги</h6>
+        <button class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="configList">
+        <div class="text-muted text-center py-3" style="font-size:12px">Нет сохранённых конфигов</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="ntf" style="position:fixed;top:20px;right:20px;z-index:9999;min-width:280px;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ══════════════════════════════════════════════════
+   СОСТОЯНИЕ
+   ══════════════════════════════════════════════════ */
+let currentFile    = null;
+let previewData    = null;   // { columns, rows, total_rows, sheets }
+let filterCount    = 0;
+let generatedText  = "";
+
+
+/* ══════════════════════════════════════════════════
+   DRAG & DROP
+   ══════════════════════════════════════════════════ */
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  const file = e.dataTransfer?.files[0];
+  if (file) setFile(file);
+});
+
+
+/* ══════════════════════════════════════════════════
+   ВЫБОР ФАЙЛА
+   ══════════════════════════════════════════════════ */
+function onFileSelected(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(file) {
+  currentFile = file;
+  const dz = document.getElementById('dropZone');
+  dz.classList.add('has-file');
+  document.getElementById('dropContent').innerHTML = `
+    <div class="drop-icon">✅</div>
+    <div class="drop-file-name">${esc(file.name)}</div>
+    <div style="font-size:11px;color:#9ca3af">${(file.size/1024).toFixed(1)} KB — нажмите чтобы сменить</div>`;
+  loadPreview();
+}
+
+
+/* ══════════════════════════════════════════════════
+   ЗАГРУЗКА ПРЕВЬЮ
+   ══════════════════════════════════════════════════ */
+async function loadPreview() {
+  if (!currentFile) return;
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('sheet_index', document.getElementById('sheetSelect').value || 0);
+  fd.append('header_row',  document.getElementById('headerRow').value || 1);
+  fd.append('preview_rows', 8);
+
+  try {
+    const r = await fetch('/api/excel-text/preview', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || 'Ошибка');
+    previewData = j.data;
+
+    // Обновляем список листов
+    const sel = document.getElementById('sheetSelect');
+    sel.innerHTML = (previewData.sheets || ['Лист 1']).map((s, i) =>
+      `<option value="${i}" ${i == sel.value ? 'selected' : ''}>${esc(s)}</option>`
+    ).join('');
+
+    renderColChips();
+    renderPreviewTable();
+    updatePatternPreview();
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('previewCard').style.display = '';
+  } catch(e) {
+    notify('Ошибка загрузки: ' + e.message, 'error');
+  }
+}
+
+function reloadPreview() {
+  if (currentFile) loadPreview();
+}
+
+
+/* ══════════════════════════════════════════════════
+   ПЛАШКИ СТОЛБЦОВ
+   ══════════════════════════════════════════════════ */
+function renderColChips() {
+  const wrap = document.getElementById('colChips');
+  if (!previewData?.columns?.length) {
+    wrap.innerHTML = '<span class="text-muted" style="font-size:12px">Столбцы не найдены</span>';
+    return;
+  }
+  wrap.innerHTML = previewData.columns.map(c =>
+    `<span class="col-chip" title="Нажмите чтобы вставить в паттерн"
+           onclick="insertPlaceholder(${JSON.stringify(c.name)}, this)">
+       <span class="idx">${c.index}</span>
+       ${esc(c.name)}
+     </span>`
+  ).join('');
+}
+
+function insertPlaceholder(colName, el) {
+  const ta = document.getElementById('patternInput');
+  const ph = `{${colName}}`;
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  ta.value = ta.value.substring(0, start) + ph + ta.value.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + ph.length;
+  ta.focus();
+  el.classList.add('inserted');
+  setTimeout(() => el.classList.remove('inserted'), 600);
+  updatePatternPreview();
+
+  // Обновляем select в фильтрах
+  updateFilterSelects();
+}
+
+
+/* ══════════════════════════════════════════════════
+   ПРЕВЬЮ ПАТТЕРНА (живой)
+   ══════════════════════════════════════════════════ */
+function updatePatternPreview() {
+  const pattern = document.getElementById('patternInput').value;
+  const line = document.getElementById('patternPreviewLine');
+
+  if (!previewData?.rows?.length || !pattern) {
+    line.innerHTML = '<span class="text-muted"><i class="fas fa-eye me-1"></i>Введите паттерн</span>';
+    return;
+  }
+
+  const cols = previewData.columns;
+  const firstRow = previewData.rows[0];
+  const colMap = {};
+  cols.forEach((c, i) => { colMap[c.name] = firstRow[i] || ''; colMap[String(i)] = firstRow[i] || ''; });
+
+  let preview = pattern;
+  Object.entries(colMap).forEach(([k, v]) => {
+    preview = preview.replace(new RegExp(`\\{${escRx(k)}\\}`, 'g'), `<span class="filled">${esc(v)}</span>`);
+  });
+
+  // Необработанные плейсхолдеры — красим
+  preview = preview.replace(/\{[^}]+\}/g, '<span style="color:#f87171">$&</span>');
+
+  line.innerHTML = `<i class="fas fa-eye me-1 text-muted"></i><span style="font-size:11px">${preview}</span>`;
+}
+
+
+/* ══════════════════════════════════════════════════
+   ПРЕВЬЮ ТАБЛИЦЫ
+   ══════════════════════════════════════════════════ */
+function renderPreviewTable() {
+  if (!previewData) return;
+  const { columns, rows, total_rows } = previewData;
+  const thead = document.querySelector('#previewTable thead');
+  const tbody = document.querySelector('#previewTable tbody');
+
+  thead.innerHTML = '<tr>' +
+    '<th style="background:#0f172a;color:#64748b;width:30px">#</th>' +
+    columns.map(c => `<th title="${esc(c.name)}">${esc(c.name.length > 18 ? c.name.slice(0,16)+'…' : c.name)}</th>`).join('') +
+    '</tr>';
+
+  tbody.innerHTML = rows.map((row, ri) =>
+    `<tr><td style="color:#94a3b8">${ri+1}</td>${row.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`
+  ).join('');
+
+  document.getElementById('previewMeta').textContent =
+    `${columns.length} столбцов, ${total_rows} строк данных`;
+}
+
+
+/* ══════════════════════════════════════════════════
+   РАЗДЕЛИТЕЛЬ
+   ══════════════════════════════════════════════════ */
+function setSep(el) {
+  document.querySelectorAll('.sep-opt').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('separatorInput').value = el.dataset.val;
+}
+
+
+/* ══════════════════════════════════════════════════
+   ФИЛЬТРЫ
+   ══════════════════════════════════════════════════ */
+function getColOptions() {
+  if (!previewData?.columns) return '<option value="">— столбец —</option>';
+  return '<option value="">— столбец —</option>' +
+    previewData.columns.map(c =>
+      `<option value="${esc(c.name)}">${esc(c.name)}</option>`
+    ).join('');
+}
+
+function addFilter() {
+  filterCount++;
+  const id = filterCount;
+  const wrap = document.getElementById('filtersWrap');
+  document.getElementById('filtersEmpty').style.display = 'none';
+
+  const div = document.createElement('div');
+  div.className = 'filter-row';
+  div.id = `filter_${id}`;
+  div.innerHTML = `
+    <select class="form-select form-select-sm" id="fcol_${id}">${getColOptions()}</select>
+    <select class="form-select form-select-sm" id="fmode_${id}" onchange="toggleFilterVal(${id})">
+      <option value="not_empty">не пустой</option>
+      <option value="contains">содержит</option>
+      <option value="not_contains">не содержит</option>
+      <option value="equals">равно</option>
+    </select>
+    <input type="text" class="form-control form-control-sm" id="fval_${id}"
+           placeholder="значение" style="display:none">
+    <button class="btn-rm-filter" onclick="removeFilter(${id})" title="Удалить">×</button>`;
+  wrap.appendChild(div);
+}
+
+function toggleFilterVal(id) {
+  const mode = document.getElementById(`fmode_${id}`).value;
+  const valInput = document.getElementById(`fval_${id}`);
+  valInput.style.display = mode === 'not_empty' ? 'none' : '';
+}
+
+function removeFilter(id) {
+  document.getElementById(`filter_${id}`)?.remove();
+  const wrap = document.getElementById('filtersWrap');
+  const remaining = wrap.querySelectorAll('.filter-row');
+  if (!remaining.length) document.getElementById('filtersEmpty').style.display = '';
+}
+
+function updateFilterSelects() {
+  // Обновляем все существующие filter col-select'ы
+  const opts = getColOptions();
+  document.querySelectorAll('[id^="fcol_"]').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if (cur) sel.value = cur;
+  });
+}
+
+function getFilters() {
+  const filters = [];
+  document.querySelectorAll('.filter-row').forEach(row => {
+    const id = row.id.replace('filter_', '');
+    const col  = document.getElementById(`fcol_${id}`)?.value;
+    const mode = document.getElementById(`fmode_${id}`)?.value;
+    const val  = document.getElementById(`fval_${id}`)?.value || '';
+    if (col) filters.push({ col, mode, value: val });
+  });
+  return filters;
+}
+
+
+/* ══════════════════════════════════════════════════
+   ГЕНЕРАЦИЯ
+   ══════════════════════════════════════════════════ */
+async function generate() {
+  if (!currentFile) { notify('Сначала загрузите файл', 'warning'); return; }
+  const pattern = document.getElementById('patternInput').value.trim();
+  if (!pattern)  { notify('Введите паттерн текста', 'warning'); return; }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Генерация...';
+
+  const config = {
+    sheet_index: parseInt(document.getElementById('sheetSelect').value) || 0,
+    header_row:  parseInt(document.getElementById('headerRow').value)  || 1,
+    skip_rows:   parseInt(document.getElementById('skipRows').value)   || 0,
+    max_rows:    parseInt(document.getElementById('maxRows').value)    || 0,
+    pattern,
+    separator:   document.getElementById('separatorInput').value,
+    skip_empty:  document.getElementById('skipEmpty').checked,
+    filters:     getFilters()
+  };
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('config', JSON.stringify(config));
+
+  try {
+    const r = await fetch('/api/excel-text/generate', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || 'Ошибка');
+
+    const d = j.data;
+    generatedText = d.text || '';
+
+    // Статистика
+    document.getElementById('statRow').style.display = '';
+    document.getElementById('statGenerated').textContent = d.count;
+    document.getElementById('statSkipped').textContent   = d.skipped;
+    document.getElementById('statTotal').textContent     = d.total_processed;
+
+    // Результат
+    const area = document.getElementById('resultArea');
+    if (generatedText) {
+      area.textContent = generatedText;
+    } else {
+      area.innerHTML = '<div class="result-empty"><i class="fas fa-empty-set fa-2x"></i><span>Нет строк для вывода</span></div>';
+    }
+
+    // Кнопки
+    document.getElementById('resultActions').style.removeProperty('display');
+    document.getElementById('resultMeta').textContent =
+      `${d.count} строк · ${generatedText.length} символов`;
+
+    notify(`✓ Сгенерировано ${d.count} строк`, 'success');
+  } catch(e) {
+    notify('Ошибка: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-magic me-2"></i>Сгенерировать текст';
+  }
+}
+
+
+/* ══════════════════════════════════════════════════
+   КОПИРОВАТЬ / СКАЧАТЬ
+   ══════════════════════════════════════════════════ */
+async function copyResult() {
+  if (!generatedText) return;
+  await navigator.clipboard.writeText(generatedText).catch(() => {});
+  notify('Скопировано в буфер обмена', 'success');
+}
+
+function downloadResult() {
+  if (!generatedText) return;
+  const blob = new Blob([generatedText], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `output_${new Date().toISOString().slice(0,10)}.txt`
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+/* ══════════════════════════════════════════════════
+   СОХРАНЕНИЕ / ЗАГРУЗКА КОНФИГА (localStorage)
+   ══════════════════════════════════════════════════ */
+function getCurrentConfig() {
+  return {
+    pattern:   document.getElementById('patternInput').value,
+    separator: document.getElementById('separatorInput').value,
+    skipEmpty: document.getElementById('skipEmpty').checked,
+    headerRow: document.getElementById('headerRow').value,
+    skipRows:  document.getElementById('skipRows').value,
+    maxRows:   document.getElementById('maxRows').value,
+    filters:   getFilters()
+  };
+}
+
+function applyConfig(cfg) {
+  if (cfg.pattern)   document.getElementById('patternInput').value = cfg.pattern;
+  if (cfg.separator !== undefined) document.getElementById('separatorInput').value = cfg.separator;
+  if (cfg.skipEmpty !== undefined) document.getElementById('skipEmpty').checked = cfg.skipEmpty;
+  if (cfg.headerRow) document.getElementById('headerRow').value = cfg.headerRow;
+  if (cfg.skipRows !== undefined)  document.getElementById('skipRows').value  = cfg.skipRows;
+  if (cfg.maxRows  !== undefined)  document.getElementById('maxRows').value   = cfg.maxRows;
+  updatePatternPreview();
+}
+
+function saveConfig() {
+  const name = prompt('Название конфига:');
+  if (!name) return;
+  const configs = JSON.parse(localStorage.getItem('etConfigs') || '{}');
+  configs[name] = getCurrentConfig();
+  localStorage.setItem('etConfigs', JSON.stringify(configs));
+  notify(`Конфиг «${name}» сохранён`, 'success');
+}
+
+function loadConfigDialog() {
+  const configs = JSON.parse(localStorage.getItem('etConfigs') || '{}');
+  const keys = Object.keys(configs);
+  const list = document.getElementById('configList');
+
+  if (!keys.length) {
+    list.innerHTML = '<div class="text-muted text-center py-3" style="font-size:12px">Нет сохранённых конфигов</div>';
+  } else {
+    list.innerHTML = keys.map(k =>
+      `<div class="d-flex align-items-center gap-2 mb-2">
+         <button class="btn btn-sm btn-outline-primary flex-grow-1 text-start" onclick="applyConfigByName(${JSON.stringify(k)})">
+           <i class="fas fa-file-code me-1"></i>${esc(k)}
+         </button>
+         <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig(${JSON.stringify(k)})">×</button>
+       </div>`
+    ).join('');
+  }
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('configModal')).show();
+}
+
+function applyConfigByName(name) {
+  const configs = JSON.parse(localStorage.getItem('etConfigs') || '{}');
+  if (configs[name]) {
+    applyConfig(configs[name]);
+    bootstrap.Modal.getInstance(document.getElementById('configModal')).hide();
+    notify(`Конфиг «${name}» загружен`, 'success');
+  }
+}
+
+function deleteConfig(name) {
+  const configs = JSON.parse(localStorage.getItem('etConfigs') || '{}');
+  delete configs[name];
+  localStorage.setItem('etConfigs', JSON.stringify(configs));
+  loadConfigDialog();
+}
+
+
+/* ══════════════════════════════════════════════════
+   УТИЛИТЫ
+   ══════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escRx(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function notify(msg, type='info') {
+  const map={success:'alert-success',error:'alert-danger',warning:'alert-warning',info:'alert-info'};
+  const d=document.createElement('div');
+  d.className=`alert ${map[type]||'alert-info'} alert-dismissible fade show shadow-sm`;
+  d.style.marginBottom='8px';
+  d.innerHTML=`${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  document.getElementById('ntf').appendChild(d);
+  setTimeout(()=>{d.classList.remove('show');setTimeout(()=>d.remove(),200);},4500);
+}
+</script>
+{% endblock %}

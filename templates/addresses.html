@@ -3,68 +3,276 @@
 {% block title %}Адреса - Excel Web App{% endblock %}
 {% block page_title %}Управление адресами{% endblock %}
 
+{% block extra_css %}
+<style>
+/* =====================================================
+   БОКОВАЯ ПАНЕЛЬ НАЗНАЧЕНИЯ НОМЕНКЛАТУР
+   ===================================================== */
+.side-panel {
+    position: fixed;
+    top: 0;
+    right: -500px;
+    width: 480px;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -6px 0 30px rgba(0,0,0,.18);
+    z-index: 1060;
+    display: flex;
+    flex-direction: column;
+    transition: right .28s cubic-bezier(.4,0,.2,1);
+}
+.side-panel.open { right: 0; }
+
+.side-panel-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 1059;
+}
+.side-panel-overlay.show { display: block; }
+
+/* Шапка панели */
+.sp-header {
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    color: #fff;
+    padding: 18px 20px 14px;
+    flex-shrink: 0;
+}
+.sp-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.sp-label { font-size: 11px; opacity: .75; letter-spacing: .5px; margin-bottom: 3px; }
+.sp-title { font-size: 15px; font-weight: 600; line-height: 1.3; word-break: break-word; }
+.sp-close {
+    background: rgba(255,255,255,.2);
+    border: none;
+    color: #fff;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-left: 12px;
+    transition: background .15s;
+}
+.sp-close:hover { background: rgba(255,255,255,.35); }
+
+/* Тулбар панели */
+.sp-toolbar {
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+.sp-search { margin-bottom: 10px; }
+.sp-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sp-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: #6b7280;
+}
+.sp-count strong { color: #111; }
+
+/* Тело панели */
+.sp-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+}
+
+/* Подсказка */
+.sp-hint {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #92400e;
+    margin-bottom: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+/* Группы номенклатур */
+.nom-group { margin-bottom: 8px; }
+.nom-group-header {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    padding: 6px 0 4px;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 2px;
+}
+
+.nom-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .12s;
+    user-select: none;
+}
+.nom-item:hover { background: #f0f4ff; }
+.nom-item.checked { background: #eef2ff; }
+
+.nom-item input[type=checkbox] {
+    width: 17px; height: 17px;
+    cursor: pointer;
+    accent-color: #4f46e5;
+    flex-shrink: 0;
+}
+.nom-item-text { flex: 1; min-width: 0; }
+.nom-item-name { font-size: 13px; color: #111; line-height: 1.4; }
+.nom-item-comment { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+
+.nom-type-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+.pill-kc   { background: #dbeafe; color: #1e40af; }
+.pill-rash { background: #fef3c7; color: #92400e; }
+
+.nom-empty {
+    text-align: center;
+    padding: 40px 0;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+/* Футер панели */
+.sp-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* =====================================================
+   БЕЙДЖ В ТАБЛИЦЕ
+   ===================================================== */
+.nom-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all .15s;
+    white-space: nowrap;
+}
+.nom-badge-set {
+    background: #eef2ff;
+    color: #4338ca;
+}
+.nom-badge-set:hover { background: #e0e7ff; }
+.nom-badge-all {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px dashed #d1d5db;
+}
+.nom-badge-all:hover { background: #e5e7eb; border-color: #9ca3af; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Адреса доставки</h4>
+                    <h4 class="mb-0">
+                        <i class="fas fa-map-marker-alt me-2"></i>Адреса доставки
+                    </h4>
                     <button class="btn btn-light" onclick="showAddModal()">
                         <i class="fas fa-plus me-2"></i>Добавить адрес
                     </button>
                 </div>
+
                 <div class="card-body">
+
                     <!-- Фильтры -->
-                    <div class="row mb-4">
+                    <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label"><i class="fas fa-search me-2"></i>Поиск:</label>
-                            <input type="text" class="form-control" id="searchInput" 
-                                   placeholder="Поиск по адресу, ФИО или телефону..." onkeyup="filterTable()">
+                            <label class="form-label">
+                                <i class="fas fa-search me-1"></i>Поиск:
+                            </label>
+                            <input type="text" class="form-control" id="searchInput"
+                                   placeholder="Адрес, ФИО, телефон, НП..."
+                                   oninput="filterTable()">
                         </div>
                         <div class="col-md-6 d-flex align-items-end">
                             <div class="btn-group w-100">
                                 <button class="btn btn-outline-primary" onclick="loadAddresses()">
-                                    <i class="fas fa-sync-alt me-2"></i>Обновить
+                                    <i class="fas fa-sync-alt me-1"></i>Обновить
                                 </button>
-                                <button class="btn btn-outline-success" onclick="exportToExcel()">
-                                    <i class="fas fa-file-excel me-2"></i>Экспорт
+                                <button class="btn btn-outline-success" onclick="exportCSV()">
+                                    <i class="fas fa-file-csv me-1"></i>Экспорт CSV
                                 </button>
-                                <button class="btn btn-outline-info" onclick="showImportModal()">
-                                    <i class="fas fa-file-import me-2"></i>Импорт
+                                <button class="btn btn-outline-info" onclick="openImportModal()">
+                                    <i class="fas fa-file-import me-1"></i>Импорт
                                 </button>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Подсказка -->
+                    <div class="alert alert-info py-2 mb-3 d-flex align-items-center gap-2" style="font-size:13px">
+                        <i class="fas fa-info-circle fa-lg text-info"></i>
+                        <span>
+                            Нажмите на бейдж <strong>«Номенклатуры»</strong> в строке адреса, чтобы выбрать
+                            какие позиции будут доступны для этого адреса при создании заказа.
+                            Если ничего не выбрано — подтянутся <em>все</em> номенклатуры типа.
+                        </span>
+                    </div>
+
                     <!-- Таблица -->
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped" id="addressesTable">
+                        <table class="table table-hover table-striped align-middle" id="addressesTable">
                             <thead class="table-dark">
                                 <tr>
-                                    <th width="50" ><p style="color: black;">ID</p></th>
-                                    <th width="80"><p style="color: black;">НП</p></th>
-                                    <th><p style="color: black;">Адрес</p></th>
-                                    <th><p style="color: black;">ФИО получателя</p></th>
-                                    <th><p style="color: black;">Телефон</p></th>
-                                    <th width="150"><p style="color: black;">Действия</p></th>
+                                    <th width="50">ID</th>
+                                    <th width="65">НП</th>
+                                    <th>Адрес</th>
+                                    <th>ФИО получателя</th>
+                                    <th width="140">Телефон</th>
+                                    <th width="150">Номенклатуры</th>
+                                    <th width="120">Действия</th>
                                 </tr>
                             </thead>
                             <tbody id="addressesBody">
-                                <tr id="loadingRow">
-                                    <td colspan="6" class="text-center">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Загрузка...</span>
-                                        </div>
-                                        <p class="mt-2">Загрузка данных...</p>
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <div class="spinner-border text-primary"></div>
+                                        <div class="mt-2 text-muted">Загрузка...</div>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    
-                    <div class="mt-3 text-end">
-                        <small class="text-muted" id="itemCount">Загрузка...</small>
+
+                    <div class="text-end mt-2">
+                        <small class="text-muted" id="itemCount"></small>
                     </div>
                 </div>
             </div>
@@ -72,370 +280,598 @@
     </div>
 </div>
 
-<!-- Модальное окно добавления/редактирования -->
+
+<!-- =====================================================
+     БОКОВАЯ ПАНЕЛЬ НОМЕНКЛАТУР
+     ===================================================== -->
+<div class="side-panel-overlay" id="spOverlay" onclick="closePanel()"></div>
+
+<div class="side-panel" id="sidePanel">
+
+    <!-- Шапка -->
+    <div class="sp-header">
+        <div class="sp-header-top">
+            <div>
+                <div class="sp-label">Номенклатуры адреса</div>
+                <div class="sp-title" id="spAddressTitle">—</div>
+            </div>
+            <button class="sp-close" onclick="closePanel()">✕</button>
+        </div>
+    </div>
+
+    <!-- Тулбар -->
+    <div class="sp-toolbar">
+        <div class="sp-search">
+            <input type="text" class="form-control form-control-sm" id="spSearchInput"
+                   placeholder="Поиск номенклатуры..." oninput="filterNomList()">
+        </div>
+        <div class="sp-actions">
+            <button class="btn btn-sm btn-outline-primary" onclick="selectAll()">
+                <i class="fas fa-check-double me-1"></i>Все
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                <i class="fas fa-times me-1"></i>Снять
+            </button>
+            <span class="sp-count">Выбрано: <strong id="spSelectedCount">0</strong></span>
+        </div>
+    </div>
+
+    <!-- Тело -->
+    <div class="sp-body">
+        <div class="sp-hint">
+            <span>💡</span>
+            <span>
+                Если ничего не выбрать — при создании заказа подтянутся
+                <strong>все</strong> номенклатуры данного типа.
+            </span>
+        </div>
+        <div id="spNomList">
+            <div class="nom-empty">Загрузка...</div>
+        </div>
+    </div>
+
+    <!-- Футер -->
+    <div class="sp-footer">
+        <button class="btn btn-primary flex-grow-1" onclick="saveAssignment()">
+            <i class="fas fa-save me-2"></i>Сохранить
+        </button>
+        <button class="btn btn-outline-secondary px-4" onclick="closePanel()">Отмена</button>
+    </div>
+</div>
+
+
+<!-- =====================================================
+     МОДАЛКА ДОБАВИТЬ / РЕДАКТИРОВАТЬ АДРЕС
+     ===================================================== -->
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">Добавить адрес</h5>
+                <h5 class="modal-title" id="editModalTitle">Добавить адрес</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="editForm">
+                <form id="editForm" novalidate>
                     <input type="hidden" id="editId">
-                    <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <label for="editNpNumber" class="form-label">Номер НП</label>
-                            <input type="text" class="form-control" id="editNpNumber" 
-                                   placeholder="16">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Номер НП</label>
+                            <input type="text" class="form-control" id="editNpNumber" placeholder="16">
                         </div>
-                        <div class="col-md-9 mb-3">
-                            <label for="editAddress" class="form-label">Адрес *</label>
+                        <div class="col-md-9">
+                            <label class="form-label">Адрес <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="editAddress" required
                                    placeholder="Кропивницкий, Маланюка, 1А">
                             <div class="invalid-feedback">Введите адрес</div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editContactPerson" class="form-label">ФИО получателя *</label>
+                        <div class="col-md-6">
+                            <label class="form-label">ФИО получателя <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="editContactPerson" required
-                                   placeholder="Чорний Александр Викторович">
+                                   placeholder="Иванов Иван Иванович">
                             <div class="invalid-feedback">Введите ФИО</div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editPhone" class="form-label">Телефон</label>
-                            <input type="text" class="form-control" id="editPhone" 
+                        <div class="col-md-6">
+                            <label class="form-label">Телефон</label>
+                            <input type="text" class="form-control" id="editPhone"
                                    placeholder="(067)5211993">
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Отмена
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" onclick="saveAddress()">
-                    <i class="fas fa-save me-2"></i>Сохранить
+                    <i class="fas fa-save me-1"></i>Сохранить
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно импорта -->
+
+<!-- =====================================================
+     МОДАЛКА ИМПОРТ
+     ===================================================== -->
 <div class="modal fade" id="importModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Импорт адресов из Excel</h5>
+                <h5 class="modal-title">Импорт адресов</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Формат Excel файла должен содержать колонки: 
-                    <strong>НП, Адрес, ФИО, Телефон</strong>
+                    Колонки файла: <strong>np_number, address, contact_person, phone</strong>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Выберите Excel файл:</label>
-                    <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls">
-                </div>
-                <div class="progress mb-3 d-none" id="importProgress">
-                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                </div>
+                <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls,.csv">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" onclick="importAddresses()">Импорт</button>
+                <button type="button" class="btn btn-primary" onclick="doImport()">Импортировать</button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Уведомления -->
+<div id="notifContainer" style="position:fixed;top:20px;right:20px;z-index:9999;min-width:280px;"></div>
+
+{% endblock %}
+
 {% block extra_js %}
 <script>
-    let currentEditId = null;
-    let addressesData = [];
+/* =============================================================
+   ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+   ============================================================= */
+let addresses     = [];          // все адреса из API
+let allNom        = [];          // ВСЯ номенклатура (загружается один раз при старте)
+let nomCountCache = {};          // { address_id: count }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        loadAddresses();
+let currentEditId = null;        // ID редактируемого адреса (null = новый)
+
+// Панель
+let spAddressId   = null;
+let spChecked     = new Set();   // ID номенклатур, отмеченных в панели
+
+
+/* =============================================================
+   СТАРТ
+   ============================================================= */
+document.addEventListener('DOMContentLoaded', async () => {
+    // Сначала грузим номенклатуру, потом адреса
+    await fetchAllNomenclature();
+    await loadAddresses();
+});
+
+
+/* =============================================================
+   ЗАГРУЗКА НОМЕНКЛАТУРЫ (один раз)
+   ============================================================= */
+async function fetchAllNomenclature() {
+    try {
+        const res  = await fetch('/api/nomenclature?per_page=100');
+        const json = await res.json();
+        allNom = json.data || [];
+        console.log(`[nom] загружено ${allNom.length} позиций`);
+    } catch (e) {
+        console.error('[nom] ошибка загрузки:', e);
+        notify('Не удалось загрузить номенклатуры', 'warning');
+    }
+}
+
+
+/* =============================================================
+   ЗАГРУЗКА АДРЕСОВ
+   ============================================================= */
+async function loadAddresses() {
+    try {
+        const res  = await fetch('/api/addresses?per_page=100');
+        const json = await res.json();
+        addresses  = json.data || [];
+        await fetchAllCounts();
+        renderTable(addresses);
+    } catch (e) {
+        notify('Ошибка загрузки адресов: ' + e.message, 'error');
+    }
+}
+
+async function fetchAllCounts() {
+    nomCountCache = {};
+    await Promise.all(addresses.map(async a => {
+        try {
+            const res  = await fetch(`/api/addresses/${a.id}/nomenclature`);
+            const json = await res.json();
+            nomCountCache[a.id] = (json.data?.ids || []).length;
+        } catch {
+            nomCountCache[a.id] = 0;
+        }
+    }));
+}
+
+
+/* =============================================================
+   РЕНДЕР ТАБЛИЦЫ
+   ============================================================= */
+function renderTable(list) {
+    const tbody = document.getElementById('addressesBody');
+    document.getElementById('itemCount').textContent = `${list.length} адресов`;
+
+    if (!list.length) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" class="text-center text-muted py-5">
+                <i class="fas fa-map-marked-alt fa-2x mb-2 d-block"></i>Нет адресов
+            </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = list.map(a => {
+        const cnt = nomCountCache[a.id] ?? 0;
+        const badge = cnt > 0
+            ? `<button class="nom-badge nom-badge-set" onclick="openPanel(${a.id}, this)">
+                   <i class="fas fa-link"></i> ${cnt} позиций
+               </button>`
+            : `<button class="nom-badge nom-badge-all" onclick="openPanel(${a.id}, this)">
+                   <i class="fas fa-asterisk"></i> Все
+               </button>`;
+
+        return `<tr>
+            <td class="fw-bold text-muted">${a.id}</td>
+            <td>${a.np_number ? `<span class="badge bg-info text-dark">${a.np_number}</span>` : '—'}</td>
+            <td><strong>${a.address}</strong></td>
+            <td>${a.contact_person}</td>
+            <td>${a.phone
+                ? `<a href="tel:${a.phone}" class="text-decoration-none text-dark">
+                       <i class="fas fa-phone me-1 text-muted"></i>${a.phone}
+                   </a>`
+                : '—'}</td>
+            <td>${badge}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary"  title="Редактировать" onclick="editItem(${a.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger"   title="Удалить"       onclick="deleteItem(${a.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" title="Копировать"   onclick="copyItem(${a.id})">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderTable(q ? addresses.filter(a =>
+        a.address.toLowerCase().includes(q) ||
+        a.contact_person.toLowerCase().includes(q) ||
+        (a.phone && a.phone.toLowerCase().includes(q)) ||
+        (a.np_number && String(a.np_number).toLowerCase().includes(q))
+    ) : addresses);
+}
+
+
+/* =============================================================
+   БОКОВАЯ ПАНЕЛЬ — открытие
+   ============================================================= */
+async function openPanel(addressId, triggerEl) {
+    // Защита: если номенклатура ещё не загружена — грузим
+    if (!allNom.length) {
+        await fetchAllNomenclature();
+    }
+
+    if (!allNom.length) {
+        notify('Номенклатура пуста. Сначала добавьте позиции в раздел «Номенклатура».', 'warning');
+        return;
+    }
+
+    spAddressId = addressId;
+    spChecked   = new Set();
+
+    // Находим объект адреса для заголовка
+    const addr = addresses.find(a => a.id === addressId);
+    document.getElementById('spAddressTitle').textContent = addr ? addr.address : `ID ${addressId}`;
+    document.getElementById('spSearchInput').value = '';
+
+    // Загружаем текущие назначения
+    try {
+        const res  = await fetch(`/api/addresses/${addressId}/nomenclature`);
+        const json = await res.json();
+        (json.data?.ids || []).forEach(id => spChecked.add(id));
+    } catch (e) {
+        console.error('[panel] ошибка загрузки назначений:', e);
+    }
+
+    renderNomList('');
+    updateCount();
+
+    document.getElementById('sidePanel').classList.add('open');
+    document.getElementById('spOverlay').classList.add('show');
+}
+
+function closePanel() {
+    document.getElementById('sidePanel').classList.remove('open');
+    document.getElementById('spOverlay').classList.remove('show');
+    spAddressId = null;
+}
+
+
+/* =============================================================
+   БОКОВАЯ ПАНЕЛЬ — рендер списка
+   ============================================================= */
+function renderNomList(query) {
+    const q   = query.toLowerCase();
+    const filtered = allNom.filter(n =>
+        !q ||
+        n.name.toLowerCase().includes(q) ||
+        (n.comment && n.comment.toLowerCase().includes(q))
+    );
+
+    const container = document.getElementById('spNomList');
+
+    if (!filtered.length) {
+        container.innerHTML = '<div class="nom-empty">Ничего не найдено</div>';
+        return;
+    }
+
+    // Группируем по типу
+    const groups = {};
+    filtered.forEach(n => {
+        if (!groups[n.type]) groups[n.type] = [];
+        groups[n.type].push(n);
     });
 
-    function loadAddresses() {
-        showLoading();
-        
-        fetch('/api/addresses')
-            .then(response => response.json())
-            .then(data => {
-                hideLoading();
-                addressesData = data.data;
-                renderTable(addressesData);
-            })
-            .catch(error => {
-                hideLoading();
-                showNotification(`Ошибка загрузки: ${error.message}`, 'error');
-            });
-    }
+    container.innerHTML = Object.entries(groups).map(([type, items]) => {
+        const pillCls = type === 'КЦ' ? 'pill-kc' : 'pill-rash';
 
-    function renderTable(data) {
-        const tbody = document.getElementById('addressesBody');
-        tbody.innerHTML = '';
-        
-        if (data.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
-                        <i class="fas fa-map-marked-alt fa-2x mb-3"></i>
-                        <p>Нет данных об адресах</p>
-                    </td>
-                </tr>
-            `;
-            document.getElementById('itemCount').textContent = '0 записей';
-            return;
-        }
-        
-        data.forEach(item => {
-            const row = `
-                <tr>
-                    <td class="fw-bold">${item.id}</td>
-                    <td>
-                        ${item.np_number ? `<span class="badge bg-info">${item.np_number}</span>` : '-'}
-                    </td>
-                    <td>
-                        <strong>${item.address}</strong>
-                    </td>
-                    <td>${item.contact_person}</td>
-                    <td>
-                        ${item.phone ? `
-                            <a href="tel:${item.phone}" class="text-decoration-none">
-                                <i class="fas fa-phone me-1"></i>${item.phone}
-                            </a>
-                        ` : '-'}
-                    </td>
-                    <td>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editItem(${item.id})" 
-                                    title="Редактировать">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="deleteItem(${item.id})" 
-                                    title="Удалить">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <button class="btn btn-outline-success" onclick="copyToClipboard(${item.id})" 
-                                    title="Копировать">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
+        const rows = items.map(n => {
+            const checked = spChecked.has(n.id);
+            return `
+                <div class="nom-item ${checked ? 'checked' : ''}"
+                     id="ni_${n.id}"
+                     onclick="toggleItem(${n.id})">
+                    <input type="checkbox"
+                           id="cb_${n.id}"
+                           ${checked ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleItem(${n.id})">
+                    <div class="nom-item-text">
+                        <div class="nom-item-name">${escHtml(n.name)}</div>
+                        ${n.comment ? `<div class="nom-item-comment">${escHtml(n.comment)}</div>` : ''}
+                    </div>
+                    <span class="nom-type-pill ${pillCls}">${type}</span>
+                </div>`;
+        }).join('');
+
+        return `<div class="nom-group">
+                    <div class="nom-group-header">${type}</div>
+                    ${rows}
+                </div>`;
+    }).join('');
+}
+
+function toggleItem(id) {
+    if (spChecked.has(id)) {
+        spChecked.delete(id);
+    } else {
+        spChecked.add(id);
+    }
+    // Обновляем только нужный элемент (без полного ре-рендера)
+    const item = document.getElementById(`ni_${id}`);
+    const cb   = document.getElementById(`cb_${id}`);
+    if (item) item.classList.toggle('checked', spChecked.has(id));
+    if (cb)   cb.checked = spChecked.has(id);
+    updateCount();
+}
+
+function filterNomList() {
+    renderNomList(document.getElementById('spSearchInput').value);
+}
+
+function selectAll() {
+    allNom.forEach(n => spChecked.add(n.id));
+    renderNomList(document.getElementById('spSearchInput').value);
+    updateCount();
+}
+
+function deselectAll() {
+    spChecked.clear();
+    renderNomList(document.getElementById('spSearchInput').value);
+    updateCount();
+}
+
+function updateCount() {
+    document.getElementById('spSelectedCount').textContent = spChecked.size;
+}
+
+
+/* =============================================================
+   БОКОВАЯ ПАНЕЛЬ — сохранение
+   ============================================================= */
+async function saveAssignment() {
+    if (!spAddressId) return;
+
+    try {
+        const res = await fetch(`/api/addresses/${spAddressId}/nomenclature`, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({ nomenclature_ids: [...spChecked] })
         });
-        
-        document.getElementById('itemCount').textContent = `${data.length} адресов`;
-    }
 
-    function filterTable() {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const filteredData = addressesData.filter(item => 
-            item.address.toLowerCase().includes(searchTerm) || 
-            item.contact_person.toLowerCase().includes(searchTerm) ||
-            (item.phone && item.phone.toLowerCase().includes(searchTerm)) ||
-            (item.np_number && item.np_number.toLowerCase().includes(searchTerm))
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || res.statusText);
+        }
+
+        // Обновляем кеш и перерисовываем только бейдж
+        nomCountCache[spAddressId] = spChecked.size;
+        closePanel();
+
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        renderTable(q ? addresses.filter(a =>
+            a.address.toLowerCase().includes(q) || a.contact_person.toLowerCase().includes(q)
+        ) : addresses);
+
+        notify(
+            spChecked.size > 0
+                ? `✓ Назначено ${spChecked.size} номенклатур`
+                : '✓ Назначения сброшены — будут использоваться все',
+            'success'
         );
-        renderTable(filteredData);
+    } catch (e) {
+        notify('Ошибка сохранения: ' + e.message, 'error');
     }
+}
 
-    function showAddModal() {
-        currentEditId = null;
-        document.getElementById('modalTitle').textContent = 'Добавить адрес';
-        document.getElementById('editId').value = '';
-        document.getElementById('editNpNumber').value = '';
-        document.getElementById('editAddress').value = '';
-        document.getElementById('editContactPerson').value = '';
-        document.getElementById('editPhone').value = '';
-        
-        document.getElementById('editForm').classList.remove('was-validated');
-        
-        const modal = new bootstrap.Modal(document.getElementById('editModal'));
-        modal.show();
-    }
 
-    function editItem(id) {
-        const item = addressesData.find(i => i.id === id);
-        if (item) {
-            currentEditId = id;
-            document.getElementById('modalTitle').textContent = 'Редактировать адрес';
-            document.getElementById('editId').value = item.id;
-            document.getElementById('editNpNumber').value = item.np_number || '';
-            document.getElementById('editAddress').value = item.address;
-            document.getElementById('editContactPerson').value = item.contact_person;
-            document.getElementById('editPhone').value = item.phone || '';
-            
-            document.getElementById('editForm').classList.remove('was-validated');
-            
-            const modal = new bootstrap.Modal(document.getElementById('editModal'));
-            modal.show();
-        }
-    }
+/* =============================================================
+   CRUD АДРЕСОВ
+   ============================================================= */
+function showAddModal() {
+    currentEditId = null;
+    document.getElementById('editModalTitle').textContent = 'Добавить адрес';
+    document.getElementById('editId').value            = '';
+    document.getElementById('editNpNumber').value      = '';
+    document.getElementById('editAddress').value       = '';
+    document.getElementById('editContactPerson').value = '';
+    document.getElementById('editPhone').value         = '';
+    document.getElementById('editForm').classList.remove('was-validated');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+}
 
-    function saveAddress() {
-        const form = document.getElementById('editForm');
-        if (!form.checkValidity()) {
-            form.classList.add('was-validated');
-            return;
-        }
-        
-        const npNumber = document.getElementById('editNpNumber').value.trim();
-        const address = document.getElementById('editAddress').value.trim();
-        const contactPerson = document.getElementById('editContactPerson').value.trim();
-        const phone = document.getElementById('editPhone').value.trim();
-        
-        if (!address || !contactPerson) {
-            showNotification('Заполните обязательные поля', 'error');
-            return;
-        }
-        
-        const data = {
-            np_number: npNumber,
-            address: address,
-            contact_person: contactPerson,
-            phone: phone
-        };
-        
-        const url = currentEditId ? `/api/addresses/${currentEditId}` : '/api/addresses';
-        const method = currentEditId ? 'PUT' : 'POST';
-        
-        showLoading();
-        
-        fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => {
-            if (!response.ok) throw new Error('Ошибка сохранения');
-            return response.json();
-        })
-        .then(() => {
-            hideLoading();
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-            modal.hide();
-            loadAddresses();
-            showNotification(currentEditId ? 'Адрес обновлен' : 'Адрес добавлен', 'success');
-        })
-        .catch(error => {
-            hideLoading();
-            showNotification(`Ошибка: ${error.message}`, 'error');
+function editItem(id) {
+    const a = addresses.find(x => x.id === id);
+    if (!a) return;
+    currentEditId = id;
+    document.getElementById('editModalTitle').textContent = 'Редактировать адрес';
+    document.getElementById('editId').value            = a.id;
+    document.getElementById('editNpNumber').value      = a.np_number || '';
+    document.getElementById('editAddress').value       = a.address;
+    document.getElementById('editContactPerson').value = a.contact_person;
+    document.getElementById('editPhone').value         = a.phone || '';
+    document.getElementById('editForm').classList.remove('was-validated');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+}
+
+async function saveAddress() {
+    const form = document.getElementById('editForm');
+    if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+
+    const body = {
+        np_number:      document.getElementById('editNpNumber').value.trim(),
+        address:        document.getElementById('editAddress').value.trim(),
+        contact_person: document.getElementById('editContactPerson').value.trim(),
+        phone:          document.getElementById('editPhone').value.trim()
+    };
+
+    const url    = currentEditId ? `/api/addresses/${currentEditId}` : '/api/addresses';
+    const method = currentEditId ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
         });
-    }
-
-    function deleteItem(id) {
-        confirmAction(
-            'Удаление адреса',
-            'Вы уверены, что хотите удалить этот адрес?',
-            function() {
-                showLoading();
-                
-                fetch(`/api/addresses/${id}`, {
-                    method: 'DELETE'
-                })
-                .then(response => {
-                    if (!response.ok) throw new Error('Ошибка удаления');
-                    return response.json();
-                })
-                .then(() => {
-                    hideLoading();
-                    loadAddresses();
-                    showNotification('Адрес удален', 'success');
-                })
-                .catch(error => {
-                    hideLoading();
-                    showNotification(`Ошибка: ${error.message}`, 'error');
-                });
-            }
-        );
-    }
-
-    function copyToClipboard(id) {
-        const item = addressesData.find(i => i.id === id);
-        if (item) {
-            const text = `Адрес: ${item.address}\nФИО: ${item.contact_person}\nТелефон: ${item.phone || 'не указан'}`;
-            navigator.clipboard.writeText(text)
-                .then(() => showNotification('Адрес скопирован в буфер обмена', 'success'))
-                .catch(() => showNotification('Не удалось скопировать адрес', 'error'));
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Ошибка сохранения');
         }
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+        await loadAddresses();
+        notify(currentEditId ? 'Адрес обновлён' : 'Адрес добавлен', 'success');
+    } catch (e) {
+        notify('Ошибка: ' + e.message, 'error');
     }
+}
 
-    function exportToExcel() {
-        showLoading();
-        
-        fetch('/api/addresses')
-            .then(response => response.json())
-            .then(data => {
-                // Создаем CSV
-                let csv = 'НП;Адрес;ФИО получателя;Телефон\n';
-                data.data.forEach(item => {
-                    csv += `${item.np_number || ''};"${item.address}";"${item.contact_person}";"${item.phone || ''}"\n`;
-                });
-                
-                // Создаем и скачиваем файл
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', `адреса_${new Date().toISOString().split('T')[0]}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                hideLoading();
-                showNotification('Экспорт завершен', 'success');
-            })
-            .catch(error => {
-                hideLoading();
-                showNotification(`Ошибка экспорта: ${error.message}`, 'error');
-            });
+async function deleteItem(id) {
+    const a = addresses.find(x => x.id === id);
+    if (!confirm(`Удалить адрес?\n${a?.address || id}`)) return;
+    try {
+        const res = await fetch(`/api/addresses/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Ошибка удаления');
+        await loadAddresses();
+        notify('Адрес удалён', 'success');
+    } catch (e) {
+        notify(e.message, 'error');
     }
+}
 
-    function showImportModal() {
-        const modal = new bootstrap.Modal(document.getElementById('importModal'));
-        modal.show();
-    }
+function copyItem(id) {
+    const a = addresses.find(x => x.id === id);
+    if (!a) return;
+    const text = `Адрес: ${a.address}\nФИО: ${a.contact_person}\nТелефон: ${a.phone || '—'}`;
+    navigator.clipboard.writeText(text)
+        .then(() => notify('Скопировано в буфер', 'success'))
+        .catch(() => notify('Не удалось скопировать', 'error'));
+}
 
-    function importAddresses() {
-        const fileInput = document.getElementById('importFile');
-        const file = fileInput.files[0];
-        
-        if (!file) {
-            showNotification('Выберите файл для импорта', 'error');
-            return;
-        }
-        
-        // TODO: Реализовать импорт из Excel
-        showNotification('Импорт будет реализован в следующей версии', 'info');
-        
-        const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
-        modal.hide();
-    }
 
-    function showLoading() {
-        let spinner = document.getElementById('loadingSpinner');
-        if (!spinner) {
-            spinner = document.createElement('div');
-            spinner.id = 'loadingSpinner';
-            spinner.className = 'spinner-container';
-            spinner.innerHTML = '<div class="spinner"></div>';
-            document.body.appendChild(spinner);
-        }
-    }
+/* =============================================================
+   ЭКСПОРТ / ИМПОРТ
+   ============================================================= */
+function exportCSV() {
+    let csv = '\uFEFF' + 'НП;Адрес;ФИО;Телефон\n'; // BOM для Excel
+    addresses.forEach(a => {
+        csv += `"${a.np_number || ''}";"${a.address}";"${a.contact_person}";"${a.phone || ''}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const link = Object.assign(document.createElement('a'), {
+        href: url, download: `addresses_${yyyymmdd()}.csv`
+    });
+    link.click();
+    URL.revokeObjectURL(url);
+    notify('CSV экспортирован', 'success');
+}
 
-    function hideLoading() {
-        document.getElementById('loadingSpinner')?.remove();
+function openImportModal() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('importModal')).show();
+}
+
+async function doImport() {
+    const file = document.getElementById('importFile').files[0];
+    if (!file) { notify('Выберите файл', 'warning'); return; }
+    const form = new FormData();
+    form.append('file', file);
+    try {
+        const res  = await fetch('/api/addresses/import', { method: 'POST', body: form });
+        const json = await res.json();
+        bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+        await loadAddresses();
+        notify(json.message || 'Импорт выполнен', 'success');
+    } catch (e) {
+        notify('Ошибка импорта: ' + e.message, 'error');
     }
+}
+
+
+/* =============================================================
+   УТИЛИТЫ
+   ============================================================= */
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+}
+
+function yyyymmdd() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function notify(msg, type = 'info') {
+    const map = { success:'alert-success', error:'alert-danger', warning:'alert-warning', info:'alert-info' };
+    const div = document.createElement('div');
+    div.className = `alert ${map[type] || 'alert-info'} alert-dismissible fade show shadow-sm`;
+    div.style.marginBottom = '8px';
+    div.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.getElementById('notifContainer').appendChild(div);
+    setTimeout(() => { div.classList.remove('show'); setTimeout(() => div.remove(), 200); }, 4500);
+}
 </script>
-{% endblock %}
 {% endblock %}
